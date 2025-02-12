@@ -1,0 +1,52 @@
+import os, json, re
+import numpy as np
+from io import StringIO
+from local_classes.variables import Lists
+import streamlit as st
+
+
+class ElevationParser:
+    def __init__(self):
+        #constant List Values
+        self.CONSTS = Lists      
+
+    def parse_upload_io(self, upload_value):
+        '''Parse Tide Dataset bytes from file. Only works with NAMRIA tide dataset'''
+
+        # To convert to a string based IO:
+        stringio = StringIO(upload_value.getvalue().decode("utf-8"))
+
+        #read as strings
+        string_data = stringio.read()
+
+        return string_data
+    
+
+    def parse_data_linestring(self, dataset):
+        '''Parse the string data representation into a compatible dataset'''
+
+        data_collection = {}
+
+        for line_values in dataset.strip().split("\n"):
+            readings = line_values[:72]
+            mtd = line_values[72:80]
+
+            #reading parser
+            readings = [readings[i:i+3].strip() for i in range(0, 72, 3)]
+            # Convert readings to integers, using NaN for missing values
+            readings = np.array([int(r) if r.isdigit() else np.nan for r in readings])
+
+            #mtd match
+            station_id, month, day, year = [x.strip() for x in (mtd[:2], mtd[2:4], mtd[4:6], mtd[6:])]
+
+            # Ensure exactly 24 readings
+            while len(readings) < 24:
+                readings.append(np.nan)
+
+            # Store data in dictionary
+            data_collection[f"{month}-{day}-20{year}"] = {                       
+                "Station_ID": station_id,
+                **{f"Hour_{i}": readings[i] for i in range(24)}
+            }
+
+        return data_collection
