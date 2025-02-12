@@ -47,10 +47,7 @@ streamlit run main.py
 
 ## Developed and Designed By
 
-_:blue[JunnieBoy13]_
-
-
->> VISIT @ **JunnieBoy13**](https://junealexis.vercel.app)
+>> VISIT @ **June Alexis**(https://junealexis.vercel.app)
 
 ## Dedication
 *tideHunter* is a passion project by June Alexis Santos for the Coastal Assessment Team of the Mines and Geosciences Bureau - Regional Office 3
