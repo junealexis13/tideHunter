@@ -96,6 +96,7 @@ class SingleProcessorAppWidgets:
         monthly_avg = dataframe.T.resample(self.rsmp).mean().mean(axis=1)
         max_monthly_tide = dataframe.T.resample(self.rsmp).max().max(axis=1)
         min_monthly_tide = dataframe.T.resample(self.rsmp).min().min(axis=1)
+
         if keycode == Keys.SINGLE.value:
             monthly_avg.index = [x.strftime('%B') for x in monthly_avg.index]
             max_monthly_tide.index = [x.strftime('%B') for x in max_monthly_tide.index]
@@ -107,11 +108,21 @@ class SingleProcessorAppWidgets:
 
 
         st.subheader("Computed Monthly Average")
-        fig = px.scatter(monthly_avg, x=monthly_avg.index, y=monthly_avg)
+        fig = go.Figure()
+
         fig.update_traces(marker_color="#0ef0d6", selector=dict(type="markers"))
         fig.update_traces(marker_symbol="x", selector=dict(mode="markers"))
 
 
+        fig.add_trace(
+            go.Scatter(
+                x = monthly_avg.index,
+                y = monthly_avg,
+                mode='markers',
+                name="Monthly Mean Tide Levels",
+                marker=dict(symbol='x', color='#038576', size=12)
+            )
+        )
 
         fig.add_trace(go.Scatter(
             x=max_monthly_tide.index, 
@@ -129,7 +140,7 @@ class SingleProcessorAppWidgets:
             marker=dict(symbol='line-ew-open', color='blue',line_width=2, size=8) 
         ))
 
-        fig.update_layout(xaxis_title="Month",yaxis_title="Tide Level (cm)")
+        fig.update_layout(xaxis_title="Month",yaxis_title="Tide Level (cm)", showlegend=True)
         st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
 
 
@@ -271,7 +282,7 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
                 try:
                     self.yearly_average(self.mdf, keycode=Keys.MULTIPLE.value)
                 except AttributeError:
-                    st.error("Not enough points to create a regression calculation. Considering uploading additional point.")
+                    st.error("Not enough points to create a regression calculation. Consider uploading additional points.")
             with st.container(border=True):
                 self.date_filter(self.mdf, keycode=Keys.MULTIPLE.value)
 
