@@ -28,8 +28,9 @@ class ElevationParser:
         data_collection = {}
 
         for line_values in dataset.strip().split("\n"):
+            line_values = line_values.rstrip()
             readings = line_values[:72]
-            mtd = line_values[72:80]
+            mtd = line_values[-8:]
 
             #reading parser
             readings = [readings[i:i+3].strip() for i in range(0, 72, 3)]
@@ -38,7 +39,7 @@ class ElevationParser:
 
             #mtd match
             station_id, month, day, year = [x.strip() for x in (mtd[:2], mtd[2:4], mtd[4:6], mtd[6:])]
-
+            # st.write(station_id, month, day, year)
             # Ensure exactly 24 readings
             while len(readings) < 24:
                 readings.append(np.nan)

@@ -4,6 +4,7 @@ import numpy as np
 from appcore import ElevationParser
 from local_classes.variables import Lists, Keys
 import plotly.express as px
+import plotly.graph_objects as go
 import os
 from typing import Literal
 
@@ -70,39 +71,67 @@ class SingleProcessorAppWidgets:
         st.dataframe(filtered_df, height=200)
 
     def monthly_hourly_average(self, dataframe: pd.DataFrame, keycode: Literal["SN","MT"]):
-            # Resample to monthly frequency and calculate the mean for each hour
-            monthly_hrly_avg = dataframe.T.resample(self.rsmp).mean().T
-            if keycode == Keys.SINGLE.value:
-                monthly_hrly_avg.columns = [x.strftime('%B') for x in monthly_hrly_avg.columns]
-            else:
-                monthly_hrly_avg.columns = [x.strftime('%B %y') for x in monthly_hrly_avg.columns]
-                
-            monthly_hrly_avg.index = [x for x in range(24)]
-            st.subheader("Monthly Hourly Average Trend")
-            st.text("It could be messy viewing this plot. Try doing these.")
-            st.markdown('''
-            * Double click toggles the Single View Mode.
-            * Once in the Single View Mode, you can single click another variable to view it side-by-side
-            * From Multiple View, single click the variable that you want to exclude
-            * You can PAN within the plot or Zoom in and out. Perfect if you want to view a small plot portion.
-            ''')
-            fig = px.line(monthly_hrly_avg)
-            fig.update_layout( xaxis_title="Hour",yaxis_title="Tide Level (cm)")
-            st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt_hr")
+        # Resample to monthly frequency and calculate the mean for each hour
+        monthly_hrly_avg = dataframe.T.resample(self.rsmp).mean().T
+        if keycode == Keys.SINGLE.value:
+            monthly_hrly_avg.columns = [x.strftime('%B') for x in monthly_hrly_avg.columns]
+        else:
+            monthly_hrly_avg.columns = [x.strftime('%B %y') for x in monthly_hrly_avg.columns]
+            
+        monthly_hrly_avg.index = [x for x in range(24)]
+        st.subheader("Monthly Hourly Average Trend")
+        st.text("It could be messy viewing this plot. Try doing these.")
+        st.markdown('''
+        * Double click toggles the Single View Mode.
+        * Once in the Single View Mode, you can single click another variable to view it side-by-side
+        * From Multiple View, single click the variable that you want to exclude
+        * You can PAN within the plot or Zoom in and out. Perfect if you want to view a small plot portion.
+        ''')
+        fig = px.line(monthly_hrly_avg)
+        fig.update_layout( xaxis_title="Hour",yaxis_title="Tide Level (cm)")
+        st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt_hr")
 
     def monthly_average(self, dataframe: pd.DataFrame, keycode: Literal["SN","MT"]):
-            # Resample to monthly frequency and calculate the mean for each hour
-            monthly_avg = dataframe.T.resample(self.rsmp).mean().mean(axis=1)
-            if keycode == Keys.SINGLE.value:
-                monthly_avg.index = [x.strftime('%B') for x in monthly_avg.index]
-            else:
-                monthly_avg.index = [x.strftime('%B %y') for x in monthly_avg.index]
-            st.subheader("Computed Monthly Average")
-            fig = px.bar(monthly_avg, x=monthly_avg.index, y=monthly_avg)
-            fig.update_layout( xaxis_title="Month",yaxis_title="Tide Level (cm)")
-            st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
+        # Resample to monthly frequency and calculate the mean for each hour
+        monthly_avg = dataframe.T.resample(self.rsmp).mean().mean(axis=1)
+        max_monthly_tide = dataframe.T.resample(self.rsmp).max().max(axis=1)
+        min_monthly_tide = dataframe.T.resample(self.rsmp).min().min(axis=1)
+        if keycode == Keys.SINGLE.value:
+            monthly_avg.index = [x.strftime('%B') for x in monthly_avg.index]
+            max_monthly_tide.index = [x.strftime('%B') for x in max_monthly_tide.index]
+            min_monthly_tide.index = [x.strftime('%B') for x in min_monthly_tide.index]
+        else:
+            monthly_avg.index = [x.strftime('%B %y') for x in monthly_avg.index]
+            max_monthly_tide.index = [x.strftime('%B %y') for x in max_monthly_tide.index]
+            min_monthly_tide.index = [x.strftime('%B %y') for x in min_monthly_tide.index]
 
-            
+
+        st.subheader("Computed Monthly Average")
+        fig = px.scatter(monthly_avg, x=monthly_avg.index, y=monthly_avg)
+        fig.update_traces(marker_color="#0ef0d6", selector=dict(type="markers"))
+        fig.update_traces(marker_symbol="x", selector=dict(mode="markers"))
+
+
+
+        fig.add_trace(go.Scatter(
+            x=max_monthly_tide.index, 
+            y=max_monthly_tide, 
+            mode='markers', 
+            name='Max Monthly Tide Level', 
+            marker=dict(symbol='line-ew-open', color='red',line_width=2, size=8) 
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=min_monthly_tide.index, 
+            y=min_monthly_tide, 
+            mode='markers', 
+            name='Min Monthly Tide Level', 
+            marker=dict(symbol='line-ew-open', color='blue',line_width=2, size=8) 
+        ))
+
+        fig.update_layout(xaxis_title="Month",yaxis_title="Tide Level (cm)")
+        st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
+
 
     def create_overview(self, dataset):
         with st.expander('Dataset View'):
@@ -156,6 +185,15 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
         year_data = yearly_avg.index
         yearly_avg.index = [x.year for x in year_data]
 
+        # Calculate the maximum annual tide
+        max_annual_tide = dataframe.T.resample('Y').max().max(axis=1)
+        max_annual_tide.index = [x.year for x in max_annual_tide.index]
+
+        # Calculate another mean annual tide (e.g., median)
+        min_annual_tide = dataframe.T.resample('Y').min().min(axis=1)
+        min_annual_tide.index = [x.year for x in min_annual_tide.index]
+
+
         st.subheader(f"Computed Yearly Average: {year_data[0].year} - {year_data[-1].year}")
         fig = px.scatter(yearly_avg, x=yearly_avg.index, y=yearly_avg, trendline="ols")
 
@@ -165,23 +203,31 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
             trendline_params = trendline_results.px_fit_results.iloc[0].params
             slope = trendline_params[1]
             
-            # Add annotation for the slope
-            fig.add_annotation(
-                x=0.15, y=0.85, xref="paper", yref="paper",
-                text=f"Estimated annual change: {slope:.2f}cm",
-                showarrow=False,
-                font=dict(size=12, color="red"),
-                align="center",
-                bordercolor="black",
-                borderwidth=1,
-                borderpad=4,
-                bgcolor="white",
-                opacity=0.8
-            )
+            annot_color = "green" if slope >= 0 else "red"
 
-        fig.update_traces(marker=dict(color='cyan'), selector=dict(mode='markers'))
+            st.write(f"<p style='color:{annot_color};'>Estimated annual change: {slope:.3}cm</p>", unsafe_allow_html=True)
+
+        fig.update_traces(marker=dict(color='grey'), selector=dict(mode='markers'))
         fig.update_traces(line=dict(color='orange', width=2, dash='dash'), selector=dict(mode='lines'))
         fig.update_layout(xaxis_title="Year", yaxis_title="Tide Level (cm)")
+
+        fig.add_trace(go.Scatter(
+            x=max_annual_tide.index, 
+            y=max_annual_tide, 
+            mode='markers', 
+            name='Max Annual Tide Level', 
+            marker=dict(symbol='line-ew-open', color='red',line_width=5, size=8) 
+        ))
+
+        # Add scatter plot with small horizontal line markers for min tide
+        fig.add_trace(go.Scatter(
+            x=min_annual_tide.index, 
+            y=min_annual_tide, 
+            mode='markers', 
+            name='Min Annual Tide Level', 
+            marker=dict(symbol='line-ew-open', color='blue',line_width=5, size=8)
+        ))
+
         st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_yr")
 
     def upload_file_widget(self):
@@ -222,8 +268,10 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
                 self.monthly_average(self.mdf, keycode=Keys.MULTIPLE.value)
 
             with st.container(border=True):
-                self.yearly_average(self.mdf, keycode=Keys.MULTIPLE.value)
-                
+                try:
+                    self.yearly_average(self.mdf, keycode=Keys.MULTIPLE.value)
+                except AttributeError:
+                    st.error("Not enough points to create a regression calculation. Considering uploading additional point.")
             with st.container(border=True):
                 self.date_filter(self.mdf, keycode=Keys.MULTIPLE.value)
 
