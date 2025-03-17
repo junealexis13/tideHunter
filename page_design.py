@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from appcore import ElevationParser
-from local_classes.variables import Lists, Keys
+from local_classes.variables import Lists, Keys, Tools
 import plotly.express as px
 import plotly.graph_objects as go
 import os
@@ -18,6 +18,8 @@ class SingleProcessorAppWidgets:
             print("Silent downcasting not recognized")
             self.rsmp = "M"
 
+        self.filename = None
+
     def introduction(self):
         with st.container(border=True):
             st.subheader("What is Single Processor?")
@@ -32,6 +34,7 @@ class SingleProcessorAppWidgets:
 
             if tide_data is not None:
                 raw = parser.parse_upload_io(tide_data)
+                self.filename = tide_data.name
                 st.success("File loaded!")
                 return parser.parse_data_linestring(raw)
             
@@ -91,6 +94,8 @@ class SingleProcessorAppWidgets:
         fig.update_layout( xaxis_title="Hour",yaxis_title="Tide Level (cm)")
         st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt_hr")
 
+        return monthly_hrly_avg
+
     def monthly_average(self, dataframe: pd.DataFrame, keycode: Literal["SN","MT"]):
         # Resample to monthly frequency and calculate the mean for each hour
         monthly_avg = dataframe.T.resample(self.rsmp).mean().mean(axis=1)
@@ -140,9 +145,32 @@ class SingleProcessorAppWidgets:
             marker=dict(symbol='line-ew-open', color='blue',line_width=2, size=8) 
         ))
 
-        fig.update_layout(xaxis_title="Month",yaxis_title="Tide Level (cm)", showlegend=True)
-        st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
 
+        #add a linear regression trendline
+        regression_pred, slope, intercept = Tools.get_linear_regression(list(range(len(monthly_avg))), monthly_avg)
+        fig.add_trace(
+            go.Scatter(
+                x=monthly_avg.index,
+                y=regression_pred,
+                mode='lines',
+                name="Trendline",
+                line=dict(color='grey', width=1, dash='dash')
+            )
+        )
+
+        fig.update_layout(xaxis_title="Month",yaxis_title="Tide Level (cm)", showlegend=True)
+        fig.update_layout(
+                legend=dict(
+                    orientation="h",  # Horizontal layout
+                    yanchor="top",  # Anchor the legend to the top
+                    y=-0.2,  # Move it below the plot
+                    xanchor="center",  # Center the legend
+                    x=0.5  # Center it horizontally
+                )
+            )
+        
+        st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
+        return monthly_avg, slope, intercept
 
     def create_overview(self, dataset):
         with st.expander('Dataset View'):
@@ -160,6 +188,40 @@ class SingleProcessorAppWidgets:
             st.dataframe(preview,height=850)
             st.text("You can also download a copy of the file. However your mouse to the dataframe and click the download icon.")
 
+    def generate_report(self, monthly_avg: pd.Series, monthly_hrly_avg, slope, intercept):
+        if isinstance(monthly_avg, pd.Series):
+            annual_avg_values = monthly_avg.mean()
+        else:
+            annual_avg_values = monthly_avg[0].mean()
+
+        st.header("Tide Report")
+        st.text("Generate a summary report of the tide data.")
+        st.divider()
+
+        dataset = {
+            "Annual Tide Average": f"{annual_avg_values:.2f}cm",
+            "Mean Rate of Change": f"{slope:.3f}cm",
+            "Equation of the line": f"y={slope:.3f}x + {intercept:.3f}"
+        }
+
+        st.table(pd.DataFrame(dataset, index=[self.filename.split(".")[0]]))
+
+        # st.write(f"Annual Tide Average: {annual_avg_values:.2f}cm")
+        # st.write(f"Mean Rate of Change: {slope:.3f}cm")
+        # st.write(f"Equation of the line: y={slope:.3f}x + {intercept:.3f}")
+
+        filename = self.filename.split(".")[0]
+        download_button = st.download_button("Download a .txt summary copy",
+                                            f"Monthly Tide Average: {annual_avg_values:.2f}cm\n"
+                                            f"Mean Rate of Change: {slope:.3f}cm\n"
+                                            f"Equation of the line: y={slope:.3f}x + {intercept:.3f}",
+                                            f"tide_report_{filename}.txt",
+            key="gen_report_monthly"
+        )
+        if download_button:
+            st.write("Download the report here.")
+
+
             
     def body(self):
         #view the body if the dataset is not empty
@@ -174,11 +236,11 @@ class SingleProcessorAppWidgets:
                 self.create_overview(dataset=dataset)
 
             with st.container(border=True):
-                self.monthly_hourly_average(self.df, keycode=Keys.SINGLE.value)
-                
+                hourlyAvg = self.monthly_hourly_average(self.df, keycode=Keys.SINGLE.value)
             with st.container(border=True):
-                self.monthly_average(self.df, keycode=Keys.SINGLE.value)
-                
+                monthlyAvg, slope, intercept = self.monthly_average(self.df, keycode=Keys.SINGLE.value)
+            with st.container(border=True):
+                self.generate_report(monthlyAvg, hourlyAvg, slope, intercept)
             with st.container(border=True):
                 self.date_filter(self.df, keycode=Keys.SINGLE.value)
 

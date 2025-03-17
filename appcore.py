@@ -49,5 +49,4 @@ class ElevationParser:
                 "Station_ID": station_id,
                 **{f"Hour_{i}": readings[i] for i in range(24)}
             }
-
         return data_collection
