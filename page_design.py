@@ -69,7 +69,11 @@ class TideStationLocator:
                                          sorted(LVL3Locations.City_Municipality.value),
                                          placeholder="Select City/Municipality",
                                          key="city_muni")
-                    
+                    prov = st.selectbox("Province",
+                                         sorted(LVL3Locations.Province.value),
+                                         placeholder="Select Province",
+                                         index=2,
+                                         key="province")
                 with view_settings:
                     tile_set = st.selectbox(
                         "Choose Viewing Mode",
@@ -81,45 +85,50 @@ class TideStationLocator:
 
 
                 if place:
-                    city_data = admin_places[admin_places["ADM3_EN"] == place]
-                    long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
+                    try:
+                        city_data = admin_places[(admin_places["ADM3_EN"] == place) & (admin_places["ADM2_EN"] == prov)]
+                        long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
 
-                    #create map and add pins into it
-                    m = folium.Map(location=[lat, long], zoom_start=8, tiles=tile_set)
-                    folium.Marker([lat, long], popup=place, icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
+                        #create map and add pins into it
+                        m = folium.Map(location=[lat, long], zoom_start=8, tiles=tile_set)
+                        folium.Marker([lat, long], popup=place, icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
 
-                    #add stations data
-                    for _, row in primary_ST.iterrows():
-                        folium.Marker([row["Lat"], row["Long"]],
-                                      popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
-                                      icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(m)
+                        #add stations data
+                        for _, row in primary_ST.iterrows():
+                            folium.Marker([row["Lat"], row["Long"]],
+                                        popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
+                                        icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(m)
 
-                    for _, row in secondary_ST.iterrows():
-                        folium.Marker([row["Lat"], row["Long"]],
-                                      popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
-                                      icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
+                        for _, row in secondary_ST.iterrows():
+                            folium.Marker([row["Lat"], row["Long"]],
+                                        popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
+                                        icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
 
 
-                    sf.folium_static(m, width=635, height=400)
+                        sf.folium_static(m, width=635, height=400)
 
-                    
+                        
 
-                    with st.container(border=True):
-                        button,number = st.columns([1,2], gap="small",vertical_alignment="center")
-                        with button:
-                            show_nearest_stations = st.button("Show nearest Station")
-                        with number:
-                            show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2)
-                        if show_nearest_stations:
-                            near_st = Tools.calculate_distances_from_points((lat, long), primary_ST, secondary_ST, int(show_ranked))
-                            for k, v in near_st.items():
-                                st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+                        with st.container(border=True):
+                            button,number = st.columns([1,2], gap="small",vertical_alignment="center")
+                            with button:
+                                show_nearest_stations = st.button("Show nearest Station")
+                            with number:
+                                show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2)
+                            if show_nearest_stations:
+                                near_st = Tools.calculate_distances_from_points((lat, long), primary_ST, secondary_ST, int(show_ranked))
+                                for k, v in near_st.items():
+                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
 
-                            download_contents = st.download_button(
-                                "Download summary of report",
-                                data=json.dumps(near_st, indent=4),
-                                file_name="nearby_stations.txt",
-                                mime="text/plain")
+                                download_contents = st.download_button(
+                                    "Download summary of report",
+                                    data=json.dumps(near_st, indent=4),
+                                    file_name="nearby_stations.txt",
+                                    mime="text/plain")
+                                
+                    except IndexError:
+                        st.error(f"Error location. There is no place like **{place}**, **{prov}** :face_with_one_eyebrow_raised:")
+
 
     def body(self):
         #view the body if the dataset is not empty

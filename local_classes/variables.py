@@ -18,13 +18,14 @@ class LVL3Locations(Enum):
 
 class CartoTileViews(Enum):
     tilesets = [
+        "esri-worldimagery",
         "opentopomap",
         "openstreetmap-hot",
         "cartodb-positron",
         "esri-natgeoworldmap",
-        "esri-worldimagery",
         "stadia-stamentoner",
         "stadia-stamentonerlite",
+        "stadia-alidadesmoothdark"
     ]
 
 class Tools:
