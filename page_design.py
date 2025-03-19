@@ -2,12 +2,130 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from appcore import ElevationParser
-from local_classes.variables import Lists, Keys, Tools
+import streamlit_folium as sf
+from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews
 import plotly.express as px
 import plotly.graph_objects as go
-import os
+import os, json
 from typing import Literal
+import folium
 
+class TideStationLocator:
+    def __init__(self):
+        pass
+
+    def app_header(self):
+        with st.container(border=True):
+            col1, col2 = st.columns([0.3, 0.7])
+            with col1:
+                st.image(os.path.join("resources","media","logo.png"), use_container_width=True)
+            with col2:
+                st.title("tideHunter")
+                st.write("A simplified, _friendly_ interface for processing :blue[NAMRIA Tide Data]")
+                st.write("_for :blue[MGBR3 - Coastal Assessment Team]_")
+
+    def introduction(self):
+        with st.container(border=True):
+            st.subheader("What is Tide Station Locator?")
+            st.text("Tide Station Locator, as it name suggests, locates the nearest tide station in the vicinity of a specified point.")
+            st.divider()
+            st.subheader(":green[_How I do it?_] :sunglasses: ")
+            st.write("Geodesic distance! To calculate the geodesic distance, I basically need two coordinates. The :blue[location] and the :red[nearest tide stations].")
+            st.write('''Using NAMRIA station dataset, I calculated the distance matrix from one location to many. Choose the shortest path and return the nearest. 
+                     I use NAMRIA Administrative Boundary centroids as starting basepoint representing Region III cities and municipalities.''')
+            st.subheader("Sample code")
+            st.code('''
+                    from geopy.distance import geodesic
+
+                    # all using WGS84
+                    point1 = (lat, long)
+
+                    from station_point to manyPoints:               # calculation
+                        print(geodesic(point1, station_point).km)   #calculate and prints out the distance 
+                    ''')
+            
+    def station_locator(self):
+        primary_ST = pd.read_csv(os.path.join("resources","geospatial","primary_stations.csv"))
+        secondary_ST = pd.read_csv(os.path.join("resources","geospatial","secondary_stations.csv"))
+        admin_places = pd.read_csv(os.path.join("resources","geospatial","adm3_places.csv"))
+        with st.container(border=True):
+            st.subheader("Tide Stations - PH")
+            st.text("View the primary and secondary stations for the tide data.")
+            
+            with st.expander("Tide Stations - Philippines", expanded=False):
+                st.text("Primary Stations")
+                st.dataframe(primary_ST.drop(columns=["Long","Lat"], inplace=False))
+                st.text("Secondary Stations")
+                st.dataframe(secondary_ST.drop(columns=["Long","Lat"], inplace=False))
+
+            with st.container(border=True):
+                st.subheader("Station Locator")
+                st.text("Locate the nearest station based on where the user is located. Data is based on the NAMRIA ADM3 level dataset.")
+
+                city_col, view_settings = st.columns([1,1], gap='medium')
+
+                with city_col:
+                    place = st.selectbox("City/Municipality",
+                                         sorted(LVL3Locations.City_Municipality.value),
+                                         placeholder="Select City/Municipality",
+                                         key="city_muni")
+                    
+                with view_settings:
+                    tile_set = st.selectbox(
+                        "Choose Viewing Mode",
+                        CartoTileViews.tilesets.value,
+                        index=0,
+                        placeholder="",
+                        key="folium-tileset"
+                    )
+
+
+                if place:
+                    city_data = admin_places[admin_places["ADM3_EN"] == place]
+                    long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
+
+                    #create map and add pins into it
+                    m = folium.Map(location=[lat, long], zoom_start=8, tiles=tile_set)
+                    folium.Marker([lat, long], popup=place, icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
+
+                    #add stations data
+                    for _, row in primary_ST.iterrows():
+                        folium.Marker([row["Lat"], row["Long"]],
+                                      popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
+                                      icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(m)
+
+                    for _, row in secondary_ST.iterrows():
+                        folium.Marker([row["Lat"], row["Long"]],
+                                      popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
+                                      icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
+
+
+                    sf.folium_static(m, width=635, height=400)
+
+                    
+
+                    with st.container(border=True):
+                        button,number = st.columns([1,2], gap="small",vertical_alignment="center")
+                        with button:
+                            show_nearest_stations = st.button("Show nearest Station")
+                        with number:
+                            show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2)
+                        if show_nearest_stations:
+                            near_st = Tools.calculate_distances_from_points((lat, long), primary_ST, secondary_ST, int(show_ranked))
+                            for k, v in near_st.items():
+                                st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+
+                            download_contents = st.download_button(
+                                "Download summary of report",
+                                data=json.dumps(near_st, indent=4),
+                                file_name="nearby_stations.txt",
+                                mime="text/plain")
+
+    def body(self):
+        #view the body if the dataset is not empty
+        self.app_header()
+        self.introduction()
+        self.station_locator()
 
 class SingleProcessorAppWidgets:
     def __init__(self):    
@@ -221,8 +339,6 @@ class SingleProcessorAppWidgets:
         if download_button:
             st.write("Download the report here.")
 
-
-            
     def body(self):
         #view the body if the dataset is not empty
         self.app_header()
@@ -243,8 +359,6 @@ class SingleProcessorAppWidgets:
                 self.generate_report(monthlyAvg, hourlyAvg, slope, intercept)
             with st.container(border=True):
                 self.date_filter(self.df, keycode=Keys.SINGLE.value)
-
-
 
 class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
     def introduction(self):
