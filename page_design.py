@@ -4,6 +4,7 @@ import numpy as np
 from appcore import ElevationParser
 import streamlit_folium as sf
 from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews
+from streamlit_javascript import st_javascript
 import plotly.express as px
 import plotly.graph_objects as go
 import os, json
@@ -12,7 +13,12 @@ import folium
 
 class TideStationLocator:
     def __init__(self):
-        pass
+        #dynamically fetch the window size of device
+        window_size = st_javascript("window.innerWidth + 'x' + window.innerHeight'")
+        if window_size:
+            self.width, self.height = map(int, window_size.split("x"))
+        else:
+            self.width, self.height = 800, 600  #
 
     def app_header(self):
         with st.container(border=True):
@@ -105,7 +111,7 @@ class TideStationLocator:
                                         icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
 
 
-                        sf.folium_static(m, width=635, height=400)
+                        sf.folium_static(m, width=self.width, height=self.height)
 
                         
 
