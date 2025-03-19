@@ -111,7 +111,7 @@ class TideStationLocator:
                                         icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
 
 
-                        sf.folium_static(m, width=self.width, height=self.height)
+                        sf.folium_static(m, width=int(self.width), height=int(self.height))
 
                         
 
