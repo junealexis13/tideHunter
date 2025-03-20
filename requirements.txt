@@ -3,5 +3,6 @@ geopy==2.4.1
 numpy==2.2.4
 pandas==2.2.3
 plotly==6.0.0
+statsmodels==0.14.4
 streamlit==1.42.0
 streamlit_folium==0.24.0
