@@ -335,10 +335,6 @@ class SingleProcessorAppWidgets:
 
         st.table(pd.DataFrame(dataset, index=[self.filename.split(".")[0]]))
 
-        # st.write(f"Annual Tide Average: {annual_avg_values:.2f}cm")
-        # st.write(f"Mean Rate of Change: {slope:.3f}cm")
-        # st.write(f"Equation of the line: y={slope:.3f}x + {intercept:.3f}")
-
         filename = self.filename.split(".")[0]
         download_button = st.download_button("Download a .txt summary copy",
                                             f"Monthly Tide Average: {annual_avg_values:.2f}cm\n"
@@ -348,7 +344,7 @@ class SingleProcessorAppWidgets:
             key="gen_report_monthly"
         )
         if download_button:
-            st.write("Download the report here.")
+            st.success("Report downloaded!")
 
     def body(self):
         #view the body if the dataset is not empty
@@ -379,16 +375,16 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
 
     def yearly_average(self, dataframe: pd.DataFrame, keycode: Literal["SN","MT"]):
         # Resample to yearly frequency and calculate the mean
-        yearly_avg = dataframe.T.resample('Y').mean().mean(axis=1)
+        yearly_avg = dataframe.T.resample('YE').mean().mean(axis=1)
         year_data = yearly_avg.index
         yearly_avg.index = [x.year for x in year_data]
 
         # Calculate the maximum annual tide
-        max_annual_tide = dataframe.T.resample('Y').max().max(axis=1)
+        max_annual_tide = dataframe.T.resample('YE').max().max(axis=1)
         max_annual_tide.index = [x.year for x in max_annual_tide.index]
 
         # Calculate another mean annual tide (e.g., median)
-        min_annual_tide = dataframe.T.resample('Y').min().min(axis=1)
+        min_annual_tide = dataframe.T.resample('YE').min().min(axis=1)
         min_annual_tide.index = [x.year for x in min_annual_tide.index]
 
 
