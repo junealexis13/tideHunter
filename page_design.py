@@ -451,16 +451,16 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
             with st.container(border=True):
                 try:
                     pred, y, m, b = self.yearly_average(self.mdf, keycode=Keys.MULTIPLE.value)
-                except AttributeError:
-                    st.error("Not enough points to create a regression calculation. Consider uploading additional points.")
-
-                except np.linalg.LinAlgError:
+                except (AttributeError, np.linalg.LinAlgError):
                     st.error("Not enough points to create a regression calculation. Consider uploading additional points.")
 
             with st.container(border=True):
-                # regression_pred, slope, intercpt = Tools.get_linear_regression(list(range(len(self.mdf))), self.mdf)
-                 self.generate_report_yr(pred, slope, intercept)
-
+                try:
+                    # regression_pred, slope, intercpt = Tools.get_linear_regression(list(range(len(self.mdf))), self.mdf)
+                    self.generate_report_yr(pred, slope, intercept)
+                except UnboundLocalError:
+                    pass
+        
             with st.container(border=True):
                 try:
                     self.date_filter(self.mdf, keycode=Keys.MULTIPLE.value)
