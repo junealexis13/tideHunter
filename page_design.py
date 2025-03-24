@@ -462,7 +462,10 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
                  self.generate_report_yr(pred, slope, intercept)
 
             with st.container(border=True):
-                self.date_filter(self.mdf, keycode=Keys.MULTIPLE.value)
+                try:
+                    self.date_filter(self.mdf, keycode=Keys.MULTIPLE.value)
+                except UnboundLocalError:
+                    pass
 
     def create_merged_overview(self, dataset):
         with st.expander('Dataset View'):
