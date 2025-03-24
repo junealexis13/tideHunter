@@ -242,63 +242,16 @@ class SingleProcessorAppWidgets:
 
 
         st.subheader("Computed Monthly Average")
-        fig = go.Figure()
-
-        fig.update_traces(marker_color="#0ef0d6", selector=dict(type="markers"))
-        fig.update_traces(marker_symbol="x", selector=dict(mode="markers"))
+        graph_obj = Tools.plot_monthly(monthly_avg)
+        st.plotly_chart(graph_obj, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
 
 
-        fig.add_trace(
-            go.Scatter(
-                x = monthly_avg.index,
-                y = monthly_avg,
-                mode='markers',
-                name="Monthly Mean Tide Levels",
-                marker=dict(symbol='x', color='#038576', size=12)
-            )
-        )
+        st.subheader("Range Values")
+        graph_obj_minmax = Tools.plot_high_low(min_df=min_monthly_tide, max_df=max_monthly_tide)
+        st.plotly_chart(graph_obj_minmax, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_minmax")
 
-        fig.add_trace(go.Scatter(
-            x=max_monthly_tide.index, 
-            y=max_monthly_tide, 
-            mode='markers', 
-            name='Max Monthly Tide Level', 
-            marker=dict(symbol='line-ew-open', color='red',line_width=2, size=8) 
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=min_monthly_tide.index, 
-            y=min_monthly_tide, 
-            mode='markers', 
-            name='Min Monthly Tide Level', 
-            marker=dict(symbol='line-ew-open', color='blue',line_width=2, size=8) 
-        ))
-
-
-        #add a linear regression trendline
-        regression_pred, slope, intercept = Tools.get_linear_regression(list(range(len(monthly_avg))), monthly_avg)
-        fig.add_trace(
-            go.Scatter(
-                x=monthly_avg.index,
-                y=regression_pred,
-                mode='lines',
-                name="Trendline",
-                line=dict(color='grey', width=1, dash='dash')
-            )
-        )
-
-        fig.update_layout(xaxis_title="Month",yaxis_title="Tide Level (cm)", showlegend=True)
-        fig.update_layout(
-                legend=dict(
-                    orientation="h",  # Horizontal layout
-                    yanchor="top",  # Anchor the legend to the top
-                    y=-0.2,  # Move it below the plot
-                    xanchor="center",  # Center the legend
-                    x=0.5  # Center it horizontally
-                )
-            )
-        
-        st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_mt")
+        #feed to next req
+        monthly_avg, slope, intercept = Tools.get_linear_regression(list(range(len(monthly_avg))), monthly_avg)
         return monthly_avg, slope, intercept
 
     def create_overview(self, dataset):
@@ -375,31 +328,27 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
 
     def yearly_average(self, dataframe: pd.DataFrame, keycode: Literal["SN","MT"]):
         # Resample to yearly frequency and calculate the mean
-        yearly_avg = dataframe.T.resample('YE').mean().mean(axis=1)
+        try:
+            resamp_code = "YE"
+            yearly_avg = dataframe.T.resample(resamp_code).mean().mean(axis=1)
+        except ValueError:
+            resamp_code = "Y"
+            yearly_avg = dataframe.T.resample(resamp_code).mean().mean(axis=1)
+
         year_data = yearly_avg.index
         yearly_avg.index = [x.year for x in year_data]
 
         # Calculate the maximum annual tide
-        max_annual_tide = dataframe.T.resample('YE').max().max(axis=1)
+        max_annual_tide = dataframe.T.resample(resamp_code).max().max(axis=1)
         max_annual_tide.index = [x.year for x in max_annual_tide.index]
 
         # Calculate another mean annual tide (e.g., median)
-        min_annual_tide = dataframe.T.resample('YE').min().min(axis=1)
+        min_annual_tide = dataframe.T.resample(resamp_code).min().min(axis=1)
         min_annual_tide.index = [x.year for x in min_annual_tide.index]
 
 
         st.subheader(f"Computed Yearly Average: {year_data[0].year} - {year_data[-1].year}")
         fig = px.scatter(yearly_avg, x=yearly_avg.index, y=yearly_avg, trendline="ols")
-
-        #addin annot
-        trendline_results = px.get_trendline_results(fig)
-        if trendline_results is not None:
-            trendline_params = trendline_results.px_fit_results.iloc[0].params
-            slope = trendline_params[1]
-            
-            annot_color = "green" if slope >= 0 else "red"
-
-            st.write(f"<p style='color:{annot_color};'>Estimated annual change: {slope:.3}cm</p>", unsafe_allow_html=True)
 
         fig.update_traces(marker=dict(color='grey'), selector=dict(mode='markers'))
         fig.update_traces(line=dict(color='orange', width=2, dash='dash'), selector=dict(mode='lines'))
@@ -423,6 +372,9 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
         ))
 
         st.plotly_chart(fig, theme="streamlit", use_container_width=True, key=f"{keycode.lower()}_yr")
+        
+        y,m,b = Tools.get_linear_regression(list(range(len(yearly_avg))), yearly_avg)
+        return yearly_avg, y,m,b
 
     def upload_file_widget(self):
         parser = ElevationParser()
@@ -443,6 +395,41 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
             else:
                 st.write("Upload a valid NAMRIA tide file.")
                 return None
+            
+    def generate_report_yr(self, yearly_avg: pd.Series, slope, intercept):
+        if isinstance(yearly_avg, pd.Series):
+            annual_avg_values = yearly_avg.mean().mean()
+        else:
+            annual_avg_values = yearly_avg.mean().mean()
+
+        st.header("Tide Report")
+        st.text("Generate a summary report of the tide data.")
+        st.divider()
+
+        dataset = {
+            "Annual Tide Average": f"{annual_avg_values:.2f}cm",
+            "Mean Rate of Change": f"{slope:.3f}cm",
+            "Equation of the line": f"y={slope:.3f}x + {intercept:.3f}"
+        }
+
+        
+        st.table(pd.DataFrame(dataset,index=["Summary"]))
+
+        filename = f"{yearly_avg.index.min()}-{yearly_avg.index.max()}"
+        st.divider()
+        color = "green" if slope < 0 else "red"
+        remarks = "rising" if slope > 0 else "decreasing"
+        st.write(f"Tide level is generally **:{color}[{remarks}]**.")
+        download_button = st.download_button("Download a .txt summary copy",
+                                            f"Monthly Tide Average: {annual_avg_values:.2f}cm\n"
+                                            f"Mean Rate of Change: {slope:.3f}cm\n"
+                                            f"Equation of the line: y={slope:.3f}x + {intercept:.3f}",
+                                            f"tide_report_{filename}.txt",
+            key="gen_report_monthly"
+        )
+
+        if download_button:
+            st.success("Report downloaded!")
 
     def body(self):
         self.app_header()
@@ -459,17 +446,20 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
                 self.monthly_hourly_average(self.mdf, keycode=Keys.MULTIPLE.value)
                 
             with st.container(border=True):
-                self.monthly_average(self.mdf, keycode=Keys.MULTIPLE.value)
+                yrly_pred, slope, intercept = self.monthly_average(self.mdf, keycode=Keys.MULTIPLE.value)
 
             with st.container(border=True):
                 try:
-                    self.yearly_average(self.mdf, keycode=Keys.MULTIPLE.value)
+                    pred, y, m, b = self.yearly_average(self.mdf, keycode=Keys.MULTIPLE.value)
                 except AttributeError:
                     st.error("Not enough points to create a regression calculation. Consider uploading additional points.")
+
+            with st.container(border=True):
+                # regression_pred, slope, intercpt = Tools.get_linear_regression(list(range(len(self.mdf))), self.mdf)
+                 self.generate_report_yr(pred, slope, intercept)
+
             with st.container(border=True):
                 self.date_filter(self.mdf, keycode=Keys.MULTIPLE.value)
-
-            
 
     def create_merged_overview(self, dataset):
         with st.expander('Dataset View'):
