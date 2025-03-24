@@ -454,6 +454,9 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
                 except AttributeError:
                     st.error("Not enough points to create a regression calculation. Consider uploading additional points.")
 
+                except np.linalg.LinAlgError:
+                    st.error("Not enough points to create a regression calculation. Consider uploading additional points.")
+
             with st.container(border=True):
                 # regression_pred, slope, intercpt = Tools.get_linear_regression(list(range(len(self.mdf))), self.mdf)
                  self.generate_report_yr(pred, slope, intercept)
