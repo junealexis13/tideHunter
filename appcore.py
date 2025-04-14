@@ -3,7 +3,8 @@ import numpy as np
 from io import StringIO
 from local_classes.variables import Lists
 import streamlit as st
-
+from datetime import time, datetime
+import datetime
 
 class ElevationParser:
     def __init__(self):
@@ -50,3 +51,17 @@ class ElevationParser:
                 **{f"Hour_{i}": readings[i] for i in range(24)}
             }
         return data_collection
+    
+
+class TideParser(ElevationParser):
+    def __init__(self):
+        pass
+    
+    def parse_tide_data_linestring(self, tide_txt_data):
+        line = tide_txt_data.splitlines()
+        station_name = line[0].strip()
+        date = line[5].split(" ")[-1]
+        tide_readings = [x.strip().split(" ")[:2] for x in line[5:]]
+        tide_formatted = [[float(x[0]),  datetime.datetime.strptime(date+" "+x[1].strip(),"%m-%d-%Y %H:%M")] for x in tide_readings]
+
+        return station_name, tide_formatted

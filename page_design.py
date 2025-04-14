@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from appcore import ElevationParser
+from appcore import ElevationParser, TideParser
 from streamlit_folium import st_folium
 from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews, Options
 
@@ -210,7 +210,6 @@ class SingleProcessorAppWidgets:
         except pd._config.config.OptionError:
             print("Silent downcasting not recognized")
             self.rsmp = "M"
-
         self.filename = None
 
     def introduction(self):
@@ -548,3 +547,38 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
             st.dataframe(preview,height=850)
             st.text("You can also download a copy of the file. However your mouse to the dataframe and click the download icon.")
 
+class WXTideProcessor(SingleProcessorAppWidgets):
+    def introduction(self):
+        with st.container(border=True):
+            st.subheader("What is WXTide Processor?")
+            st.text("WXTide Processor allows the user to create statistical inference derived from synthesized tide data from WXTide Platform. For more information, visit http://wxtide32.com/")
+
+    def upload_file_widget(self):
+        parser = TideParser()
+
+        with st.container(border=True):
+            st.header("Upload File")
+            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WXTIDE.value)
+
+            if tide_data is not None:
+                raw = parser.parse_upload_io(tide_data)
+                self.filename = tide_data.name
+                st.success("File loaded!")
+                return parser.parse_tide_data_linestring(raw)
+            
+            else:
+                st.write("Upload a valid WXTide TXT tide file.")
+                return None
+
+
+    def plot_tide(self, dataset):
+        pass
+
+    def calculate_mean_tide(self, dataframe):
+        pass
+
+
+    def body(self):
+        self.app_header()
+        self.introduction()
+        dataset = self.upload_file_widget()

@@ -10,6 +10,7 @@ import streamlit as st
 
 class Lists(Enum):
     ACCEPTED_UPLOAD_FORMATS = ['LEV','COR','RAW','DEC']
+    ACCEPTED_UPLOAD_FORMATS_WXTIDE = ["TXT"]
 
 class Options(Enum):
     FOLIUM_DRAW_OPTIONS = {
