@@ -3,13 +3,14 @@ import pandas as pd
 import numpy as np
 from appcore import ElevationParser
 from streamlit_folium import st_folium
-from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews
+from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews, Options
 
 import plotly.express as px
 import plotly.graph_objects as go
 import os, json
 import geopandas as gpd
 from typing import Literal
+from folium.plugins import Draw
 import folium
 
 class TideStationLocator:
@@ -50,14 +51,26 @@ class TideStationLocator:
                     from station_point to manyPoints:               # calculation
                         print(geodesic(point1, station_point).km)   #calculate and prints out the distance 
                     ''')
-            
+
+
     def station_locator(self):
         primary_ST = pd.read_csv(os.path.join("resources","geospatial","primary_stations.csv"))
         secondary_ST = pd.read_csv(os.path.join("resources","geospatial","secondary_stations.csv"))
         admin_places = pd.read_csv(os.path.join("resources","geospatial","adm3_places.csv"))
 
+        @st.cache_data(show_spinner=True)
+        def locate_map_elements():
+            roads = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","roads","r3_road_diss.shp"))
+            boundaries = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","boundaries","region_3.shp"))
+            
+            # Drop datetime columns from boundaries
+            datetime_columns = ["date", "validOn", "validTo"]
+            boundaries = boundaries.drop(columns=[col for col in datetime_columns if col in boundaries.columns])
 
-        with st.form(key="station_locator_form"):
+            return (roads.to_json(), boundaries.to_json())
+
+
+        with st.container(border=True):
             st.subheader("Tide Stations - PH")
             st.text("View the primary and secondary stations for the tide data.")
             
@@ -72,81 +85,107 @@ class TideStationLocator:
                 st.text("Locate the nearest station based on where the user is located. Data is based on the NAMRIA ADM3 level dataset.")
                 st.caption("Take note that the geodesic distance was calculated based on the centroids of each city/municipality.")
 
-                city_col, view_settings = st.columns([1,1], gap='medium')
 
-                with city_col:
-                    place = st.selectbox("City/Municipality",
+                # settings
+                with st.container(border=True):
+                    st.subheader("Distance Calculation - Parameters")
+                    
+                    col1, col2 = st.columns([1,1])
+                    with col1:
+                        show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2, key="show_ranked")
+                        show_roads = st.checkbox("Show Roads", value=False, key="show_roads_checkbox")
+                        show_boundaries = st.checkbox("Show Boundaries", value=True, key="show_boundaries_checkbox")
+                        show_drawbox = st.checkbox("Show Draw Box", value=False, key="show_drawbox_checkbox")
+
+                    with col2:
+                        #dynamically disable the place and province selectbox if drawbox is shown
+                        tile_set = st.selectbox(
+                            "Choose Viewing Mode",
+                            CartoTileViews.tilesets.value,
+                            index=0,
+                            placeholder="",
+                            key="folium-tileset"
+                        )
+                        place = st.selectbox("City/Municipality",
                                          sorted(LVL3Locations.City_Municipality.value),
                                          placeholder="Select City/Municipality",
-                                         key="city_muni")
-                    prov = st.selectbox("Province",
+                                         key="city_muni",
+                                         disabled=show_drawbox)
+                        prov = st.selectbox("Province",
                                          sorted(LVL3Locations.Province.value),
                                          placeholder="Select Province",
                                          index=2,
-                                         key="province")
-                with view_settings:
-                    tile_set = st.selectbox(
-                        "Choose Viewing Mode",
-                        CartoTileViews.tilesets.value,
-                        index=0,
-                        placeholder="",
-                        key="folium-tileset"
-                    )
+                                         key="province",
+                                         disabled=show_drawbox)
 
+                    st.caption("Show roads will significantly slow down the map rendering. Use with caution.")
+            
+            #initialize map
+            m = folium.Map(location=[15.0790122,120.8849141], zoom_start=8, tiles=tile_set)
+
+            with st.form(key="folium_map"):   
                 fetch = st.form_submit_button("Fetch Nearest Station", help="Fetch the nearest station based on the selected city/municipality and province.")
-
                 if fetch:
                     try:
-                        city_data = admin_places[(admin_places["ADM3_EN"] == place) & (admin_places["ADM2_EN"] == prov)]
-                        long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
-
-                        st.session_state.subject_coordinates = (lat, long)
-
                         #create map and add pins into it
-                        m = folium.Map(location=[lat, long], zoom_start=8, tiles=tile_set)
-                        folium.Marker([lat, long], popup=place, icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
-
-                        #add stations data
-                        for _, row in primary_ST.iterrows():
-                            folium.Marker([row["Lat"], row["Long"]],
-                                        popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
-                                        icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(m)
-
-                        for _, row in secondary_ST.iterrows():
-                            folium.Marker([row["Lat"], row["Long"]],
-                                        popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
-                                        icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
-
-                        @st.cache_data(show_spinner=True)
-                        def locate_map_elements():
-                            roads = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","roads","r3_road_diss.shp"))
-                            boundaries = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","boundaries","region_3.shp"))
-                            
-                            # Drop datetime columns from boundaries
-                            datetime_columns = ["date", "validOn", "validTo"]
-                            boundaries = boundaries.drop(columns=[col for col in datetime_columns if col in boundaries.columns])
-
-                            return (roads.to_json(), boundaries.to_json())
+                        if show_drawbox:
+                            Draw(export=True, draw_options=Options.FOLIUM_DRAW_OPTIONS.value).add_to(m)
+                            st.info("Drop a pin on the map to calculate the distance. Click again the button to calculate the distance.")
+                        else:
+                            city_data = admin_places[(admin_places["ADM3_EN"] == place) & (admin_places["ADM2_EN"] == prov)]
+                            long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
+                            st.session_state.subject_coordinates = (lat, long)
+                            folium.Marker([lat, long], popup=f"{place}, {prov}", icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
                         
-                        #load shapefiles and add to map
-                        roads, boundaries = locate_map_elements()
 
-                        folium.GeoJson(data=roads, name="Roads", style_function=lambda x: {"color": "yellow", "weight": 0.3}).add_to(m)
-                        folium.GeoJson(data=boundaries, name="Boundaries", style_function=lambda x: {"color": "black", "weight": 1}).add_to(m)
-
-                        st_folium(m,use_container_width=True, height=500)
-                        st.divider()
-                        with st.container(border=True):
-                            st.subheader("Distance Calculation - Parameters")
-                            show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2, key="show_ranked")
-                        st.divider()
 
                         with st.container(border=True):
-                            near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
-                            st.session_state.download_report = near_st
-                            for k, v in near_st.items():
-                                st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+                            st.subheader("Map View")
+                                            #initialize map
+                            #load shapefiles and add to map
+                            roads, boundaries = locate_map_elements()
 
+                            #shows the elements
+                            if show_roads:
+                                folium.GeoJson(data=roads, name="Roads", style_function=lambda x: {"color": "cyan", "weight": 0.3}).add_to(m)
+                            if show_boundaries:
+                                folium.GeoJson(data=boundaries, name="Boundaries", style_function=lambda x: {"color": "yellow", "weight": 1}).add_to(m)
+
+                            for _, row in primary_ST.iterrows():
+                                folium.Marker([row["Lat"], row["Long"]],
+                                            popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
+                                            icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(m)
+
+                            for _, row in secondary_ST.iterrows():
+                                folium.Marker([row["Lat"], row["Long"]],
+                                            popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
+                                            icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
+                            fol_map = st_folium(m,use_container_width=True, height=500)
+
+
+                        with st.container(border=True):
+                            if not show_drawbox:
+                                near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
+                                st.session_state.download_report = near_st
+                                for k, v in near_st.items():
+                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+
+                            elif show_drawbox:
+                                poi = fol_map['all_drawings']
+                                if poi is not None:
+                                    for i, point in enumerate(poi):
+                                        with st.container(border=True):
+                                            st.subheader(f"Point {i+1}")
+                                            if point["geometry"]["type"] == "Point":
+                                                lat = point["geometry"]["coordinates"][1]
+                                                long = point["geometry"]["coordinates"][0]
+                                                st.session_state.subject_coordinates = (lat, long)
+                                                near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
+                                                st.session_state.download_report = near_st
+                                                for k, v in near_st.items():
+                                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+                                            else:
+                                                st.error("Drawing is not a point. Please try again.")
 
                     except IndexError:
                         st.error(f"Error location. There is no place like **{place}**, **{prov}** :face_with_one_eyebrow_raised:")

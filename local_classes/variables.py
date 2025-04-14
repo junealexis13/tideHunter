@@ -11,6 +11,16 @@ import streamlit as st
 class Lists(Enum):
     ACCEPTED_UPLOAD_FORMATS = ['LEV','COR','RAW','DEC']
 
+class Options(Enum):
+    FOLIUM_DRAW_OPTIONS = {
+        "polyline": False,
+        "polygon": False,
+        "circle": False,
+        "rectangle": False,
+        "circlemarker": False,
+        "marker": True 
+    }
+
 class Keys(Enum):
     SINGLE = "SN"
     MULTIPLE = 'MT'
