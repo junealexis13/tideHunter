@@ -8,13 +8,18 @@ from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTile
 import plotly.express as px
 import plotly.graph_objects as go
 import os, json
+import geopandas as gpd
 from typing import Literal
 import folium
 
 class TideStationLocator:
     def __init__(self):
         #dynamically fetch the window size of device
-        pass
+        #removed
+        if "subject_coordinates" not in st.session_state:
+            st.session_state.subject_coordinates = None
+        if "download_report" not in st.session_state:
+            st.session_state.download_report = None
 
     def app_header(self):
         with st.container(border=True):
@@ -50,7 +55,9 @@ class TideStationLocator:
         primary_ST = pd.read_csv(os.path.join("resources","geospatial","primary_stations.csv"))
         secondary_ST = pd.read_csv(os.path.join("resources","geospatial","secondary_stations.csv"))
         admin_places = pd.read_csv(os.path.join("resources","geospatial","adm3_places.csv"))
-        with st.container(border=True):
+
+
+        with st.form(key="station_locator_form"):
             st.subheader("Tide Stations - PH")
             st.text("View the primary and secondary stations for the tide data.")
             
@@ -63,6 +70,7 @@ class TideStationLocator:
             with st.container(border=True):
                 st.subheader("Station Locator")
                 st.text("Locate the nearest station based on where the user is located. Data is based on the NAMRIA ADM3 level dataset.")
+                st.caption("Take note that the geodesic distance was calculated based on the centroids of each city/municipality.")
 
                 city_col, view_settings = st.columns([1,1], gap='medium')
 
@@ -85,11 +93,14 @@ class TideStationLocator:
                         key="folium-tileset"
                     )
 
+                fetch = st.form_submit_button("Fetch Nearest Station", help="Fetch the nearest station based on the selected city/municipality and province.")
 
-                if place:
+                if fetch:
                     try:
                         city_data = admin_places[(admin_places["ADM3_EN"] == place) & (admin_places["ADM2_EN"] == prov)]
                         long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
+
+                        st.session_state.subject_coordinates = (lat, long)
 
                         #create map and add pins into it
                         m = folium.Map(location=[lat, long], zoom_start=8, tiles=tile_set)
@@ -106,31 +117,45 @@ class TideStationLocator:
                                         popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
                                         icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
 
+                        @st.cache_data(show_spinner=True)
+                        def locate_map_elements():
+                            roads = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","roads","r3_road_diss.shp"))
+                            boundaries = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","boundaries","region_3.shp"))
+                            
+                            # Drop datetime columns from boundaries
+                            datetime_columns = ["date", "validOn", "validTo"]
+                            boundaries = boundaries.drop(columns=[col for col in datetime_columns if col in boundaries.columns])
+
+                            return (roads.to_json(), boundaries.to_json())
+                        
+                        #load shapefiles and add to map
+                        roads, boundaries = locate_map_elements()
+
+                        folium.GeoJson(data=roads, name="Roads", style_function=lambda x: {"color": "yellow", "weight": 0.3}).add_to(m)
+                        folium.GeoJson(data=boundaries, name="Boundaries", style_function=lambda x: {"color": "black", "weight": 1}).add_to(m)
 
                         st_folium(m,use_container_width=True, height=500)
-
-                        
+                        st.divider()
+                        with st.container(border=True):
+                            st.subheader("Distance Calculation - Parameters")
+                            show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2, key="show_ranked")
+                        st.divider()
 
                         with st.container(border=True):
-                            button,number = st.columns([1,2], gap="small",vertical_alignment="center")
-                            with button:
-                                show_nearest_stations = st.button("Show nearest Station")
-                            with number:
-                                show_ranked = st.text_input("Show how many stations nearby",'5',max_chars=2)
-                            if show_nearest_stations:
-                                near_st = Tools.calculate_distances_from_points((lat, long), primary_ST, secondary_ST, int(show_ranked))
-                                for k, v in near_st.items():
-                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+                            near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
+                            st.session_state.download_report = near_st
+                            for k, v in near_st.items():
+                                st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
 
-                                download_contents = st.download_button(
-                                    "Download summary of report",
-                                    data=json.dumps(near_st, indent=4),
-                                    file_name="nearby_stations.txt",
-                                    mime="text/plain")
-                                
+
                     except IndexError:
                         st.error(f"Error location. There is no place like **{place}**, **{prov}** :face_with_one_eyebrow_raised:")
-
+                        
+        download_contents = st.download_button(
+            "Download summary of report",
+            data=json.dumps(st.session_state.download_report, indent=4),
+            file_name="nearby_stations.txt",
+            mime="text/plain")
 
     def body(self):
         #view the body if the dataset is not empty
