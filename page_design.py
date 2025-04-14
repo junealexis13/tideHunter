@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from appcore import ElevationParser, TideParser
 from streamlit_folium import st_folium
-from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews, Options
+from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews, Options, Others
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,6 +12,8 @@ import geopandas as gpd
 from typing import Literal
 from folium.plugins import Draw
 import folium
+
+from datetime import datetime, timedelta
 
 class TideStationLocator:
     def __init__(self):
@@ -569,16 +571,70 @@ class WXTideProcessor(SingleProcessorAppWidgets):
             else:
                 st.write("Upload a valid WXTide TXT tide file.")
                 return None
-
+            
 
     def plot_tide(self, dataset):
-        pass
+        station = dataset[0]
+        data = [val for (val,_) in dataset[1]]
+        dates = [date for (_,date) in dataset[1]]
+        date_fetched = dataset[2]
+
+        #create a dataframe and plot in plotly
+        df = pd.DataFrame(data, columns=["Tide Level"])
+        df["TimeUnit"] = pd.to_datetime(dates, format="%d-%m-%Y %H:%M")
+
+        #plot using plotly go
+
+        fig = go.Figure()
+
+        with st.container(border=True):
+            st.subheader(f"{station} ({date_fetched})")
+            st.text("This plot is interactive. You can zoom in and out. You can also hover over the plot to view the data.")
+
+            fig.add_trace(go.Scatter(x=df["TimeUnit"], y=df["Tide Level"], mode='lines', name=station))
+            st.plotly_chart(fig, theme="streamlit", use_container_width=True, key="wxtide_plot")
+
+        return df
+    
 
     def calculate_mean_tide(self, dataframe):
-        pass
+        with st.container(border=True):
+            st.caption("Calculate the mean tide level based on the selected timeframe. The time unit is in minutes. But it depends on the data provided.")
+            st.caption("E.g. If you uploaded every 5 minutes, the plot will only show values per 5 minutes.")
+
+            # conver the time unit to datetime compatible with streamlit - it prefer pythondt.dt
+            dataframe['TimeUnit'] = pd.to_datetime(dataframe['TimeUnit'], format="%H:%M")
+            data = dataframe["TimeUnit"]
+            dataframe['FormattedDT'] = [x.to_pydatetime().time() for x in data]
+
+            #calculate the mean tide level
+            from_, to_ = st.columns([1,1])
+            with from_:
+                fromTime = st.time_input("From",
+                                        value=dataframe['FormattedDT'].min(), 
+                                        key="wxtide_from",
+                                        step=timedelta(minutes=1))
+            with to_:
+                toTime = st.time_input("To", 
+                                       value=dataframe['FormattedDT'].max(),
+                                       key="wxtide_to",
+                                       step=timedelta(minutes=1))
+
+            #filter the data
+            filtered_data = dataframe.loc[(dataframe['FormattedDT']>= fromTime) & (dataframe['FormattedDT'] <= toTime)]
+            mean = filtered_data['Tide Level'].mean()
+            st.caption(f"Number of samples: {len(filtered_data)}")
+
+        with st.container(border=True):
+            st.subheader("Mean Tide Level")
+            st.markdown(Others.HTML_TEMPLATE.value.replace("{{value}}", str(round(mean, 4))+"m"), unsafe_allow_html=True)
 
 
     def body(self):
         self.app_header()
         self.introduction()
         dataset = self.upload_file_widget()
+
+        if dataset:
+            df = self.plot_tide(dataset)
+            get_mean = self.calculate_mean_tide(df)

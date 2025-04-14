@@ -26,6 +26,35 @@ class Keys(Enum):
     SINGLE = "SN"
     MULTIPLE = 'MT'
 
+class Others(Enum):
+    HTML_TEMPLATE = """
+            <div style="background: linear-gradient(to right, #8e2de2, #4a00e0);
+                        color: #fff;
+                        margin: 2rem 1rem;
+                        padding: 20px;
+                        border-radius: 10px;
+                        box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3);
+                        font-family: 'arial', serif;
+                        font-size: 2.3em;
+                        font-weight: bold;
+                        letter-spacing: 0.05em;
+                        text-align: center;
+                        overflow: hidden;
+                        position: relative;">
+            <span style="display: inline-block;
+                        animation: shimmer 2s infinite alternate;">
+                {{value}}
+            </span>
+            </div>
+
+            <style>
+            @keyframes shimmer {
+            0% { text-shadow: -1px -1px 0 rgba(255, 255, 255, 0.2); }
+            100% { text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5); }
+            }
+            </style>
+            """
+
 class LVL3Locations(Enum):
     Province = list(pd.unique(pd.read_csv(os.path.join("resources","geospatial","adm3_places.csv"))["ADM2_EN"]))
     City_Municipality = list(pd.unique(pd.read_csv(os.path.join("resources","geospatial","adm3_places.csv"))["ADM3_EN"]))

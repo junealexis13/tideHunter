@@ -64,4 +64,4 @@ class TideParser(ElevationParser):
         tide_readings = [x.strip().split(" ")[:2] for x in line[5:]]
         tide_formatted = [[float(x[0]),  datetime.datetime.strptime(date+" "+x[1].strip(),"%m-%d-%Y %H:%M")] for x in tide_readings]
 
-        return station_name, tide_formatted
+        return station_name, tide_formatted, date
