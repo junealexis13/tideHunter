@@ -1,5 +1,6 @@
 # tideHunter
 
+![tideHunterBanner](resources/media/logo.png?raw=true "TideHunter")
 tideHunter is a Streamlit-based application designed to process and analyze NAMRIA tide data. It provides a user-friendly interface for both single and multiple file processing, allowing users to generate statistical inferences and visualizations.
 
 ## Features
