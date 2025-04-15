@@ -588,7 +588,7 @@ class WXTideProcessor(SingleProcessorAppWidgets):
         fig = go.Figure()
 
         with st.container(border=True):
-            st.subheader(f"{station} ({date_fetched})")
+            st.subheader(f"{station} ({date_fetched})", divider=True)
             st.text("This plot is interactive. You can zoom in and out. You can also hover over the plot to view the data.")
 
             fig.add_trace(go.Scatter(x=df["TimeUnit"], y=df["Tide Level"], mode='lines', name=station))
@@ -599,6 +599,7 @@ class WXTideProcessor(SingleProcessorAppWidgets):
 
     def calculate_mean_tide(self, dataframe):
         with st.container(border=True):
+            st.subheader('Calculation Parameters', divider=True)
             st.caption("Calculate the mean tide level based on the selected timeframe. The time unit is in minutes. But it depends on the data provided.")
             st.caption("E.g. If you uploaded every 5 minutes, the plot will only show values per 5 minutes.")
 
@@ -622,13 +623,20 @@ class WXTideProcessor(SingleProcessorAppWidgets):
 
             #filter the data
             filtered_data = dataframe.loc[(dataframe['FormattedDT']>= fromTime) & (dataframe['FormattedDT'] <= toTime)]
-            mean = filtered_data['Tide Level'].mean()
+            survey_mean = filtered_data['Tide Level'].mean()
+            daily_mean = dataframe['Tide Level'].mean()
+
             st.caption(f"Number of samples: {len(filtered_data)}")
 
         with st.container(border=True):
-            st.subheader("Mean Tide Level")
-            st.markdown(Others.HTML_TEMPLATE.value.replace("{{value}}", str(round(mean, 4))+"m"), unsafe_allow_html=True)
+            st.subheader("Tide Level during the Survey")
+            st.caption('Specific mean tide value calculated from set time interval.')
+            st.markdown(Others.HTML_TEMPLATE.value.replace("{{value}}", str(round(survey_mean, 4))+"m"), unsafe_allow_html=True)
 
+        with st.container(border=True):
+            st.subheader("Mean Tide Level")
+            st.caption('Mean tide level for the whole day.')
+            st.markdown(Others.HTML_TEMPLATE.value.replace("{{value}}", str(round(daily_mean, 4))+"m"), unsafe_allow_html=True)
 
     def body(self):
         self.app_header()
