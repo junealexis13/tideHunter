@@ -104,7 +104,7 @@ class TideStationLocator:
                         tile_set = st.selectbox(
                             "Choose Viewing Mode",
                             CartoTileViews.tilesets.value,
-                            index=0,
+                            index=3,
                             placeholder="",
                             key="folium-tileset"
                         )
@@ -138,7 +138,7 @@ class TideStationLocator:
                             long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
                             st.session_state.subject_coordinates = (lat, long)
                             folium.Marker([lat, long], popup=f"{place}, {prov}", icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
-                        
+                            
 
 
                         with st.container(border=True):
@@ -166,6 +166,8 @@ class TideStationLocator:
 
 
                         with st.container(border=True):
+                            if place and prov:
+                                st.subheader(f"Tide Station: {place}, {prov}",divider=True)
                             if not show_drawbox:
                                 near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
                                 st.session_state.download_report = near_st
@@ -177,7 +179,7 @@ class TideStationLocator:
                                 if poi is not None:
                                     for i, point in enumerate(poi):
                                         with st.container(border=True):
-                                            st.subheader(f"Point {i+1}")
+                                            st.subheader(f"Point {i+1}",divider=True)
                                             if point["geometry"]["type"] == "Point":
                                                 lat = point["geometry"]["coordinates"][1]
                                                 long = point["geometry"]["coordinates"][0]
