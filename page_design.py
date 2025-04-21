@@ -183,8 +183,22 @@ class TideStationLocator:
                                 st.subheader(f"Tide Station: {place}, {prov}",divider=True)
                                 near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
                                 st.session_state.download_report = near_st
-                                for k, v in near_st.items():
+                                for i, (k, v) in enumerate(near_st.items()):
                                     st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v['distance'], 4)} km_]")
+                                    if i == 0:
+                                        lcolor = 'green'
+                                        lweight = 2.5
+                                        dash_array = None
+                                    else:
+                                        lcolor = 'grey'
+                                        lweight = 0.5
+                                        dash_array = "5, 5"
+                                    
+                                    folium.PolyLine(locations=[(lat,long),(v['coords'][0],v['coords'][1])],popup=f"Dist to {k}: {round(v['distance'],4)}km",color=lcolor, weight=lweight,opacity=1,dash_array=dash_array).add_to(n)
+                                    folium.Marker([lat, long], popup=f"{place}, {prov}", icon=folium.Icon(color="blue", icon="flag", prefix="fa")).add_to(n)
+                                st.subheader('Distance Preview',divider=True)
+                                st.caption('The thickest green line represents the closest station. You can also click on line to view distance popup.')
+                                st_folium(n,use_container_width=True, height=600)
 
                             elif show_drawbox:
                                 poi = fol_map['all_drawings']
