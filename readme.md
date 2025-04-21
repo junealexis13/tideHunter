@@ -1,6 +1,6 @@
 # tideHunter
 ![](resources/media/python_badge.svg) ![](resources/media/streamlit.svg) ![](resources/media/tideHunter.svg)
-<img src="https://github.com/junealexis13/tideHunter/blob/f32ec95a916de7f0fa92d33bfd9220e3f4e98a24/resources/media/logo.png" width="450">
+<img src="https://github.com/junealexis13/tideHunter/blob/f32ec95a916de7f0fa92d33bfd9220e3f4e98a24/resources/media/logo.png" width="450"><br>
 tideHunter is a Streamlit-based application designed to process and analyze NAMRIA tide data. It provides a user-friendly interface for both single and multiple file processing, allowing users to generate statistical inferences and visualizations.
 
 ## Features
