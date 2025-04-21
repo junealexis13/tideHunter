@@ -23,6 +23,8 @@ class TideStationLocator:
             st.session_state.subject_coordinates = None
         if "download_report" not in st.session_state:
             st.session_state.download_report = None
+        if "folium_viewing_options" not in st.session_state:
+            st.session_state.folium_viewing_options = {"expand": True}
 
     def app_header(self):
         with st.container(border=True):
@@ -124,6 +126,7 @@ class TideStationLocator:
             
             #initialize map
             m = folium.Map(location=[15.0790122,120.8849141], zoom_start=8, tiles=tile_set)
+            n = folium.Map(location=[15.0790122,120.8849141], zoom_start=8, tiles=tile_set)
 
             with st.form(key="folium_map"):   
                 fetch = st.form_submit_button("Fetch Nearest Station", help="Fetch the nearest station based on the selected city/municipality and province.")
@@ -132,7 +135,7 @@ class TideStationLocator:
                         #create map and add pins into it
                         if show_drawbox:
                             Draw(export=True, draw_options=Options.FOLIUM_DRAW_OPTIONS.value).add_to(m)
-                            st.info("Drop a pin on the map to calculate the distance. Click again the button to calculate the distance.")
+                            st.info("Drop a pin on the map to calculate the distance. Click again the button after setting the pin to calculate the distance.")
                         else:
                             city_data = admin_places[(admin_places["ADM3_EN"] == place) & (admin_places["ADM2_EN"] == prov)]
                             long, lat = city_data["Long"].values[0], city_data["Lat"].values[0]
@@ -140,9 +143,9 @@ class TideStationLocator:
                             folium.Marker([lat, long], popup=f"{place}, {prov}", icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
                             
 
-
                         with st.container(border=True):
                             st.subheader("Map View")
+                            st.caption("If marker was enabled, you can add up to 5 points. More than it would cause leaflet to slow down.")
                                             #initialize map
                             #load shapefiles and add to map
                             with st.spinner("Loading map data. This may take awhile."):
@@ -151,46 +154,67 @@ class TideStationLocator:
                             #shows the elements
                             if show_roads:
                                 folium.GeoJson(data=roads, name="Roads", style_function=lambda x: {"color": "cyan", "weight": 0.3}).add_to(m)
+                                folium.GeoJson(data=roads, name="Roads", style_function=lambda x: {"color": "cyan", "weight": 0.3}).add_to(n)
                             if show_boundaries:
                                 folium.GeoJson(data=boundaries, name="Boundaries", style_function=lambda x: {"color": "yellow", "weight": 1}).add_to(m)
+                                folium.GeoJson(data=boundaries, name="Boundaries", style_function=lambda x: {"color": "yellow", "weight": 1}).add_to(n)
 
                             for _, row in primary_ST.iterrows():
                                 folium.Marker([row["Lat"], row["Long"]],
                                             popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
                                             icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(m)
+                                folium.Marker([row["Lat"], row["Long"]],
+                                            popup=f"<b>{row['tidestatio']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i><br>Station_code: <i>{row['code']}</i>",
+                                            icon=folium.Icon(color="green", icon="tower-observation", prefix="fa")).add_to(n)
 
                             for _, row in secondary_ST.iterrows():
                                 folium.Marker([row["Lat"], row["Long"]],
                                             popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
                                             icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(m)
-                            fol_map = st_folium(m,use_container_width=True, height=500)
-
+                                folium.Marker([row["Lat"], row["Long"]],
+                                            popup=f"<b>{row['namesecond']}</b><br>Lat: <i>{row['Lat']}</i> Long: <i>{row['Long']}</i>",
+                                            icon=folium.Icon(color="orange", icon="tower-observation", prefix="fa")).add_to(n)
+                            
+                        with st.expander('Viewfinder',expanded=st.session_state.folium_viewing_options['expand']):
+                            fol_map = st_folium(m,use_container_width=True, height=350)
 
                         with st.container(border=True):
-                            if place and prov:
-                                st.subheader(f"Tide Station: {place}, {prov}",divider=True)
                             if not show_drawbox:
+                                st.subheader(f"Tide Station: {place}, {prov}",divider=True)
                                 near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
                                 st.session_state.download_report = near_st
                                 for k, v in near_st.items():
-                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
+                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v['distance'], 4)} km_]")
 
                             elif show_drawbox:
                                 poi = fol_map['all_drawings']
                                 if poi is not None:
+                                    #contract original viewfinder in pin assignment mode
                                     for i, point in enumerate(poi):
-                                        with st.container(border=True):
+                                        with st.container(border=False):
                                             st.subheader(f"Point {i+1}",divider=True)
                                             if point["geometry"]["type"] == "Point":
-                                                lat = point["geometry"]["coordinates"][1]
-                                                long = point["geometry"]["coordinates"][0]
+                                                lat, long = point["geometry"]["coordinates"][1], point["geometry"]["coordinates"][0]
+                                                folium.Marker([lat, long], popup=f"{place}, {prov}", icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(n)
                                                 st.session_state.subject_coordinates = (lat, long)
                                                 near_st = Tools.calculate_distances_from_points(st.session_state.subject_coordinates, primary_ST, secondary_ST, int(show_ranked))
                                                 st.session_state.download_report = near_st
-                                                for k, v in near_st.items():
-                                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v, 4)} km_]")
-                                            else:
-                                                st.error("Drawing is not a point. Please try again.")
+                                                for i,(k, v) in enumerate(near_st.items()):
+                                                    st.write(f"**Distance to :blue[_{k}_]** :green[_{round(v['distance'], 4)} km_]")
+                                                    if i == 0:
+                                                        lcolor = 'green'
+                                                        lweight = 2.5
+                                                        dash_array = None
+                                                    else:
+                                                        lcolor = 'grey'
+                                                        lweight = 0.5
+                                                        dash_array = "5, 5"
+                                                    folium.PolyLine(locations=[(lat,long),(v['coords'][0],v['coords'][1])],popup=f"Dist to {k}: {round(v['distance'],4)}km",color=lcolor, weight=lweight,opacity=1,dash_array=dash_array).add_to(n)
+                                                st.divider()
+                                    st.subheader('Distance Preview',divider=True)
+                                    st.caption('The thickest green line represents the closest station. You can also click on line to view distance popup.')
+                                    st_folium(n,use_container_width=True, height=600)
+
 
                     except IndexError:
                         st.error(f"Error location. There is no place like **{place}**, **{prov}** :face_with_one_eyebrow_raised:")

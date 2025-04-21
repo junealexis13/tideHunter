@@ -90,13 +90,13 @@ class Tools:
         profiles = {}
 
         for _, prim_st in prim_stations.iterrows():
-            profiles[f"(PS) {prim_st['tidestatio']}"] = geodesic(point_coord,(prim_st['Lat'],prim_st['Long'])).km
-
+            profiles[f"(PS) {prim_st['tidestatio']}"] = {"distance": geodesic(point_coord, (prim_st['Lat'], prim_st['Long'])).km, "coords": [prim_st['Lat'], prim_st['Long']]}
         for _, sec_st in sec_stations.iterrows():
-            profiles[f"(SS) {sec_st['namesecond']}"] = geodesic(point_coord,(sec_st['Lat'],sec_st['Long'])).km
+            profiles[f"(SS) {sec_st['namesecond']}"] = {"distance": geodesic(point_coord, (sec_st['Lat'], sec_st['Long'])).km, "coords": [sec_st['Lat'], sec_st['Long']]}
 
-        sorted_dict = {k:v for k, v in sorted(profiles.items(), key=lambda item: item[1], reverse=False)}
-        return dict(islice(sorted_dict.items(),toprank))
+        # Fix sorting by accessing the 'distance' key in the nested dictionaries
+        sorted_dict = {k: v for k, v in sorted(profiles.items(), key=lambda item: item[1]['distance'], reverse=False)}
+        return dict(islice(sorted_dict.items(), toprank))
     
 
     @staticmethod
