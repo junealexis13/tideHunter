@@ -60,7 +60,7 @@ class TideStationLocator:
         secondary_ST = pd.read_csv(os.path.join("resources","geospatial","secondary_stations.csv"))
         admin_places = pd.read_csv(os.path.join("resources","geospatial","adm3_places.csv"))
 
-        @st.cache_data(show_spinner=True)
+        @st.cache_data(show_spinner=False)
         def locate_map_elements():
             roads = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","roads","r3_road_diss.shp"))
             boundaries = gpd.read_file(os.path.join(os.getcwd(),"resources","geospatial","shapefiles","boundaries","region_3.shp"))
@@ -145,7 +145,8 @@ class TideStationLocator:
                             st.subheader("Map View")
                                             #initialize map
                             #load shapefiles and add to map
-                            roads, boundaries = locate_map_elements()
+                            with st.spinner("Loading map data. This may take awhile."):
+                                roads, boundaries = locate_map_elements()
 
                             #shows the elements
                             if show_roads:
