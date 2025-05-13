@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from appcore import ElevationParser, TideParser
+import matplotlib.pyplot as plt
+from windrose import WindroseAxes
+from appcore import ElevationParser, TideParser, WindroseParser
 from streamlit_folium import st_folium
-from local_classes.variables import Lists, Keys, Tools, LVL3Locations, CartoTileViews, Options, Others
+from local_classes.variables import Lists, Dicts, Keys, Tools, LVL3Locations, CartoTileViews, Options, Others
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,6 +14,8 @@ import geopandas as gpd
 from typing import Literal
 from folium.plugins import Draw
 import folium
+
+
 
 from datetime import datetime, timedelta
 
@@ -601,7 +605,7 @@ class WXTideProcessor(SingleProcessorAppWidgets):
 
         with st.container(border=True):
             st.header("Upload File")
-            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WXTIDE.value)
+            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WXTIDE.value, key="wxtide_upload")
 
             if tide_data is not None:
                 raw = parser.parse_upload_io(tide_data)
@@ -687,3 +691,146 @@ class WXTideProcessor(SingleProcessorAppWidgets):
         if dataset:
             df = self.plot_tide(dataset)
             get_mean = self.calculate_mean_tide(df)
+
+class WindroseProcessor(SingleProcessorAppWidgets):
+    def introduction(self):
+        with st.container(border=True):
+            st.subheader("What is Windrose Processor?")
+            st.text("Windrose Processor allows the user to create statistical inference derived from wind data from PAG-ASA.")
+            st.caption("For more information, visit https://bagong.pagasa.dost.gov.ph/")
+
+    def deg_to_compass(self, degree):
+        if not pd.isna(degree):
+            directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+            index = int((degree % 360) / 22.5 + 0.5)
+            return directions[index % 16]
+        else:
+            return np.nan
+
+    def upload_file_widget(self):
+        parser = WindroseParser()
+
+        with st.container(border=True):
+            st.header("Upload File")
+            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WINDROSE.value, key="windrose_upload")
+
+            if tide_data is not None:
+                #create an empty dataframe
+                new_df = pd.DataFrame()
+
+                #parse the data
+                raw = pd.read_csv(tide_data)
+
+                #create a dateobject by merging 2 columns of Year and Month
+                new_df["Date"] = pd.to_datetime(raw["YEAR"].astype(str) + "-" + raw["MONTH"].astype(str), format="%Y-%m")
+                new_df["STRDate"] = new_df["Date"].dt.strftime("%Y-%B")
+                new_df["WindSpeed"] = raw["WIND_SPEED"].replace(-999, np.nan)
+                new_df["WindDirection"] = raw["WIND_DIRECTION"].replace(-999, np.nan)
+
+                new_df['WindDirectionDesc'] = new_df["WindDirection"].apply(self.deg_to_compass)
+                
+                #create a col where it indicates where the wind is blowing to
+                new_df['WindDirectionTo'] = (new_df['WindDirection'] + 180) % 360
+                return new_df
+            
+            else:
+                st.write("Upload a valid wind data in CSV tide file.")
+                return None
+            
+
+    def plot_windrose(self, dataset: pd.DataFrame, date_range = None, bg='#000000', cpl='viridis'):
+        #create a fig first
+        fig = plt.figure(figsize=(12,6))
+        
+        #apply customizations
+        fig.patch.set_facecolor(bg)  
+        colorMap = Dicts.COLOR_PALETTES.value[cpl]
+
+        #pre-clean df
+        df = dataset.replace(-999,np.nan)
+
+        if date_range:
+            df = df.loc[(df['Date'] > date_range[0]) & (df['Date'] < date_range[1])  ]
+        
+        #init windrose
+        ax = WindroseAxes.from_ax(fig=fig)
+
+        #set
+        ax.bar(df['WindDirectionTo'], df['WindSpeed'], normed=True, cmap=colorMap)
+        ax.set_legend(
+            title='Wind Speed (m/s)',
+            title_fontsize=8
+        )
+        return st.pyplot(fig)
+    
+    def calculate_wind_resultant(self, dataset: pd.DataFrame, date_range = None):
+        df = dataset.replace(-999,np.nan)
+        if date_range:
+            df = df.loc[(df['Date'] > date_range[0]) & (df['Date'] < date_range[1])  ]
+
+        radians = np.deg2rad(df['WindDirectionTo'])
+
+        #standard physicals components to calculate u and v components [its easier to implement component method that tail-to-tip]
+        df['u'] = df['WindSpeed'] * np.cos(radians)
+        df['v'] = df['WindSpeed'] * np.sin(radians)
+
+        u_avg = df['u'].mean()
+        v_avg = df['v'].mean()
+
+        resultant_magnitude = np.sqrt(u_avg**2 + v_avg**2)
+        resultant_direction = (np.arctan2(v_avg, u_avg) * 180 / np.pi) % 360
+
+        with st.container(border=True):
+            st.html(f'''
+                <div style="
+                    padding: 20px;
+                    border-radius: 15px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                    max-width: 500px;
+                    margin: auto;
+                    font-family: 'Segoe UI', sans-serif;
+                ">
+                    <h2 style="color: #ffffff;"> Resultant Wind Vector</h2>
+                    <p style="font-size: 1rem; margin: 0.2rem;">Magnitude: <span style="color: #00DFFF;"><b>{round(resultant_magnitude,2)}m/s</b></span></p>
+                    <p style="font-size: 1rem; margin: 0.2rem;">Direction (to): <span style="color: #FFFD00;"><b>{round(resultant_direction,2)}° </b>- Blow towards {self.describe_wind_direction(resultant_direction)}</span></p>
+                </div>
+                ''')
+
+    def plot_windrose_widget(self, dataset):
+        with st.container(border=True):
+            st.subheader('Generate a Windrose diagram',divider=True)
+            st.caption('Take note that the Wind Rose generated indicates where it was blowing to. The metadata from DOST PAG-ASA indicates that the column reflects where the wind is blowing from. I changed it into where it was blowing to.')
+
+            #create a parameter dashboard
+            with st.container(border=True):
+                    st.text('View settings')
+                    st.caption("Let's you tweak what the windrose plotter is going to show. Select date will only enable the date you want to plot. Background color changes the plot face color and the palette changes the rose colors.")
+                    date_slider = st.select_slider("Select Date",
+                                                   options=dataset.Date,
+                                                   value=(dataset.Date.min(), dataset.Date.max()))        
+                    col1, col2 = st.columns((1,1))
+                    with col1:
+                        background_color = st.color_picker('Background Color',value="#ffffff")
+                    with col2:
+                        color_palette = st.selectbox('Choose Palette',Dicts.COLOR_PALETTES.value.keys(), 3)
+           
+            gen = st.button(label="Create",key='windrose-generate')
+            if gen:
+                self.plot_windrose(dataset, date_range=date_slider, bg=background_color, cpl=color_palette)
+                self.calculate_wind_resultant(dataset, date_range=date_slider)
+
+    def describe_wind_direction(self, angle):
+        #match direction #could still be changed
+        for direction, angle_range in Dicts.WIND_DIRECTION_TEMPLATE.value.items():
+            if angle_range[0] <= angle < angle_range[1] or (direction == 'N' and angle >= angle_range[0] or angle < angle_range[1]):
+                return direction
+        
+    def body(self):
+        self.app_header()
+        self.introduction()
+        dataset = self.upload_file_widget()
+
+        if dataset is not None and isinstance(dataset, pd.DataFrame):
+            self.plot_windrose_widget(dataset)
+            

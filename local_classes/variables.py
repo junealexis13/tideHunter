@@ -7,10 +7,43 @@ import pandas as pd
 from geopy.distance import geodesic
 from itertools import islice
 import streamlit as st
+import matplotlib.cm as cm
 
 class Lists(Enum):
     ACCEPTED_UPLOAD_FORMATS = ['LEV','COR','RAW','DEC']
     ACCEPTED_UPLOAD_FORMATS_WXTIDE = ["TXT"]
+    ACCEPTED_UPLOAD_FORMATS_WINDROSE = ["CSV"]
+
+class Dicts(Enum):
+    COLOR_PALETTES = {
+                    'yellow-red': cm.YlOrRd,   
+                    'red-green': cm.RdYlGn,
+                    'cool': cm.cool,
+                    'plasma': cm.plasma,
+                    'inferno': cm.inferno,
+                    'cividis': cm.cividis,
+                    'viridis': cm.viridis
+                }
+    
+    WIND_DIRECTION_TEMPLATE = {
+            "N": (348.75, 11.25),
+            "NNE": (11.25, 33.75),
+            "NE": (33.75, 56.25),
+            "ENE": (56.25, 78.75),
+            "E": (78.75, 101.25),
+            "ESE": (101.25, 123.75),
+            "SE": (123.75, 146.25),
+            "SSE": (146.25, 168.75),
+            "S": (168.75, 191.25),
+            "SSW": (191.25, 213.75),
+            "SW": (213.75, 236.25),
+            "WSW": (236.25, 258.75),
+            "W": (258.75, 281.25),
+            "WNW": (281.25, 303.75),
+            "NW": (303.75, 326.25),
+            "NNW": (326.25, 348.75),
+        }
+
 
 class Options(Enum):
     FOLIUM_DRAW_OPTIONS = {

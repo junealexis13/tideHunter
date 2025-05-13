@@ -65,3 +65,8 @@ class TideParser(ElevationParser):
         tide_formatted = [[float(x[0]),  datetime.datetime.strptime(date+" "+x[1].strip(),"%m-%d-%Y %H:%M")] for x in tide_readings]
 
         return station_name, tide_formatted, date
+    
+
+class WindroseParser(ElevationParser):
+    def __init__(self):
+        pass
