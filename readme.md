@@ -50,6 +50,7 @@ tideHunter provides the following core functionalities:
 2. **Single NAMRIA Tide Data Processor**: Process individual NAMRIA tide data files to generate statistical summaries and visualizations.
 3. **Multiple NAMRIA Tide Data Processor**: Process and compare multiple NAMRIA tide data files spanning over multiple years or data points to identify trends and others.
 4. **WXTide Processor**: Integrate and process WXTide data for additional analysis and comparison.
+5. NEW! **Windrose Processor**: Works on PAG-ASA Datasets. Processes Wind Data to generate a Windrose map with Automated calculation of Wind Vector Components.
 
 ## Project Structure
 
