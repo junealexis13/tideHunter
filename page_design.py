@@ -255,7 +255,7 @@ class SingleProcessorAppWidgets:
             pd.set_option('future.no_silent_downcasting', True)
             self.rsmp = "ME"
         except pd._config.config.OptionError:
-            print("Silent downcasting not recognized")
+            # print("Silent downcasting not recognized")
             self.rsmp = "M"
         self.filename = None
 
