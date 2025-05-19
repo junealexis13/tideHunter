@@ -83,6 +83,13 @@ class SingleProcessorAppWidgets:
         filtered_df.columns = [str(x.date()) for x in filtered_df]
         st.dataframe(filtered_df, height=200)
 
+    def calculate_stats(self, dataframe: pd.DataFrame):
+        dfmax = dataframe.T.max(axis=1).dropna()
+        dfmin = dataframe.T.min(axis=1).dropna()
+        dfdiff = dfmax - dfmin #mean tidal range
+        dfmean = dfmax+dfmin
+        return dfdiff.mean(), dfmean.div(2).mean()
+    
     def monthly_hourly_average(self, dataframe: pd.DataFrame, keycode: Literal["SN","MT"]):
         # Resample to monthly frequency and calculate the mean for each hour
         monthly_hrly_avg = dataframe.T.resample(self.rsmp).mean().T
@@ -157,23 +164,43 @@ class SingleProcessorAppWidgets:
         else:
             annual_avg_values = monthly_avg[0].mean()
 
+        df = self.df
+        MTL = self.df.T.max()+self.df.T.min()
+        MTR = self.df.T.max()-self.df.T.min()
+
+
         st.header("Tide Report")
         st.text("Generate a summary report of the tide data.")
         st.divider()
 
         dataset = {
-            "Annual Tide Average": f"{annual_avg_values:.2f}cm",
-            "Mean Rate of Change": f"{slope:.3f}cm",
+            "Mean Sea Level": f"{annual_avg_values/100:.2f}m",
+            "Mean Tide Level": f"{round(MTL.div(2).mean()/100, 2)}m",
+            "Mean Tidal Range": f"{round(MTR.mean(), 2)}cm",
+        }
+
+        st.table(pd.DataFrame(dataset,index=["Tidal Summary"]))
+
+        regression = {
+            "Mean Rate of Change thru regression": f"{slope:.3f}cm",
             "Equation of the line": f"y={slope:.3f}x + {intercept:.3f}"
         }
 
-        st.table(pd.DataFrame(dataset, index=[self.filename.split(".")[0]]))
+        st.table(pd.DataFrame(regression,index=["Regression Summary"]))
 
+        info_text = f"""
+                Mean Sea Level: {annual_avg_values/100:.2f}m
+                Mean Tide Level: {round(MTL.div(2).mean()/100, 2)}m
+                Mean Tidal Range: {round(MTR.mean(), 2)}cm
+                {'-'*8}
+                TEMPORAL REGRESSION
+                Tidal Linear Equation: y={slope:.3f}x + {intercept:.3f}
+                Equation of the line: {slope:.3f}cm
+                """
+        
         filename = self.filename.split(".")[0]
         download_button = st.download_button("Download a .txt summary copy",
-                                            f"Monthly Tide Average: {annual_avg_values:.2f}cm\n"
-                                            f"Mean Rate of Change: {slope:.3f}cm\n"
-                                            f"Equation of the line: y={slope:.3f}x + {intercept:.3f}",
+                                            info_text,
                                             f"tide_report_{filename}.txt",
             key="gen_report_monthly"
         )
@@ -277,7 +304,11 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
                 st.write("Upload a valid NAMRIA tide file.")
                 return None
             
-    def generate_report_yr(self, yearly_avg: pd.Series, slope, intercept):
+    def generate_report_yr(self, yearly_avg: pd.Series, slope, intercept, raw):
+
+        #calculate the Mean Tide Lvl
+        MTR, MTL = self.calculate_stats(raw)
+
         if isinstance(yearly_avg, pd.Series):
             annual_avg_values = yearly_avg.mean().mean()
         else:
@@ -288,26 +319,39 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
         st.divider()
 
         dataset = {
-            "Annual Tide Average": f"{annual_avg_values:.2f}cm",
-            "Mean Rate of Change": f"{slope:.3f}cm",
+            "Mean Sea Level": f"{annual_avg_values/100:.2f}m",
+            "Mean Tide Level": f"{round(MTL/100, 2)}m",
+            "Mean Tidal Range": f"{round(MTR, 2)}cm",
+        }
+
+        st.table(pd.DataFrame(dataset,index=["Tidal Summary"]))
+
+        regression = {
+            "Mean Rate of Change thru regression": f"{slope:.3f}cm",
             "Equation of the line": f"y={slope:.3f}x + {intercept:.3f}"
         }
 
-        
-        st.table(pd.DataFrame(dataset,index=["Summary"]))
+        st.table(pd.DataFrame(regression,index=["Regression Summary"]))
 
         filename = f"{yearly_avg.index.min()}-{yearly_avg.index.max()}"
         st.divider()
+        info_text = f"""
+                Mean Sea Level: {annual_avg_values/100:.2f}m
+                Mean Tide Level: {round(MTL/100, 2)}m
+                Mean Tidal Range: {round(MTR, 2)}cm
+                {'-'*8}
+                TEMPORAL REGRESSION
+                Tidal Linear Equation: y={slope:.3f}x + {intercept:.3f}
+                Equation of the line: {slope:.3f}cm
+                """
+
         color = "green" if slope < 0 else "red"
         remarks = "rising" if slope > 0 else "decreasing"
-        st.write(f"Tide level is generally **:{color}[{remarks}]**.")
+        st.write(f"Tide level is generally **:{color}[{remarks}]** by :{color}[{round(abs(slope),2)}cm].")
         download_button = st.download_button("Download a .txt summary copy",
-                                            f"Monthly Tide Average: {annual_avg_values:.2f}cm\n"
-                                            f"Mean Rate of Change: {slope:.3f}cm\n"
-                                            f"Equation of the line: y={slope:.3f}x + {intercept:.3f}",
+                                            info_text,
                                             f"tide_report_{filename}.txt",
-            key="gen_report_monthly_multi"
-        )
+            key="gen_report_monthly_multi")
 
         if download_button:
             st.success("Report downloaded!")
@@ -337,7 +381,7 @@ class MultipleProcessorAppWidgets(SingleProcessorAppWidgets):
             with st.container(border=True):
                 try:
                     # regression_pred, slope, intercpt = Tools.get_linear_regression(list(range(len(self.mdf))), self.mdf)
-                    self.generate_report_yr(pred, slope, intercept)
+                    self.generate_report_yr(pred, slope, intercept, self.mdf)
                 except UnboundLocalError:
                     pass
         
