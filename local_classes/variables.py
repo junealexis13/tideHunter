@@ -10,7 +10,7 @@ import streamlit as st
 import matplotlib.cm as cm
 
 class Lists(Enum):
-    ACCEPTED_UPLOAD_FORMATS = ['LEV','COR','RAW','DEC']
+    ACCEPTED_UPLOAD_FORMATS = ['lev','cor','raw','dec']
     ACCEPTED_UPLOAD_FORMATS_WXTIDE = ["TXT"]
     ACCEPTED_UPLOAD_FORMATS_WINDROSE = ["CSV"]
 
