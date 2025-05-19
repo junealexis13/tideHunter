@@ -106,7 +106,7 @@ class CartoTileViews(Enum):
 
 class Tools:
     @staticmethod
-    def get_linear_regression(x, y):
+    def get_linear_regression(x: list, y: list):
         '''Get the linear regression of the given x and y values'''
 
         x = np.array(x, dtype=np.float64)
@@ -134,6 +134,7 @@ class Tools:
 
     @staticmethod
     def plot_monthly(df: pd.DataFrame):
+        df = df.dropna()
         fig = go.Figure()
 
         fig.update_traces(marker_color="#0ef0d6", selector=dict(type="markers"))
@@ -180,6 +181,7 @@ class Tools:
     
     @staticmethod
     def plot_high_low(min_df: pd.DataFrame, max_df: pd.DataFrame):
+        min_df, max_df = min_df.dropna(), max_df.dropna()
         fig = go.Figure()
 
         fig.update_traces(marker_color="#0ef0d6", selector=dict(type="markers"))
