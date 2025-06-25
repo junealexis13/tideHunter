@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from windrose import WindroseAxes
-from appcore import ElevationParser, TideParser, WindroseParser
+from appcore import ElevationParser, TideParser, WindroseParser, SurfaceParser
 from streamlit_folium import st_folium
 from local_classes.variables import Lists, Dicts, Keys, Tools, LVL3Locations, CartoTileViews, Options, Others
 
@@ -15,7 +15,9 @@ from typing import Literal
 from folium.plugins import Draw
 import folium
 
+import pykrige
 
+from io import StringIO
 
 from datetime import datetime, timedelta
 
@@ -420,6 +422,8 @@ class TideStationLocator(SingleProcessorAppWidgets):
             st.session_state.download_report = {}
         if "folium_viewing_options" not in st.session_state:
             st.session_state.folium_viewing_options = {"expand": True}
+
+
 
     def introduction(self):
         with st.container(border=True):
@@ -886,4 +890,81 @@ class WindroseProcessor(SingleProcessorAppWidgets):
 
         if dataset is not None and isinstance(dataset, pd.DataFrame):
             self.plot_windrose_widget(dataset)
+            
+class Modeller(SingleProcessorAppWidgets):
+    def __init__(self):
+        super().__init__()
+        if "raster_data_cache" not in st.session_state:
+            st.session_state["raster_data_cache"] = {}
+
+    def introduction(self):
+        with st.container(border=True):
+            st.subheader("What is Surface Modeller?")
+            st.text("Surface Modeller is a quick surface modelling tool using the output from DNR-GPS from Bathymetry Survey.")
+
+    def upload_file_widget(self):
+        parser = SurfaceParser()
+
+        with st.container(border=True):
+            st.header("Upload File")
+            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WXTIDE.value, key="wxtide_upload")
+
+            if tide_data is not None:
+                raw = parser.parse_upload_io(tide_data)
+                self.filename = tide_data.name
+                st.success("File loaded!")
+                return parser.parse_surface_data_linestring(raw)
+            
+            else:
+                st.write("Upload a valid WXTide TXT tide file.")
+                return None
+            
+
+    
+    
+    def body(self):
+        self.app_header()
+        self.introduction()
+
+        dataset = self.upload_file_widget()
+
+        parse = SurfaceParser()
+        with st.form(key="surface_modeller_form"):
+            projections = SurfaceParser.choose_projection()
+            color_choose = SurfaceParser.choose_colorscale()
+            limit_padding_percentage = SurfaceParser.padding_percentage()
+            reso = SurfaceParser.resolution_slider()
+
+            submit = st.form_submit_button("Generate Surface Model", help="Generate a surface model based on the uploaded data.")
+            if submit:
+                if dataset:
+                    df = pd.read_csv(StringIO(dataset),delimiter=",")
+                    df['depth'] = df["depth"].mul(-1)
+                    with st.spinner('Processing data...'):
+
+                        try:
+                            x,y,interpolated = parse.interpolate_data(df, reso)
+                            raster_data = parse.raster_to_bytes(interpolated,x,y,projections["COMPLETE_CRS_CODE"])
+                            if raster_data:
+                                parse.temp_save(rdata=raster_data)
+                            fig = parse.surface_fig(x, y, interpolated, colorscale=color_choose, limit_padding=limit_padding_percentage)    
+                            st.plotly_chart(fig, theme="streamlit", use_container_width=True, key="surface_plot")
+                        except Exception as e:
+                            st.error(f"An error occurred while processing the data: {e}")
+                            return
+                else:
+                    st.error("No dataset uploaded. Please upload a valid dataset.")
+
+        if st.session_state['raster_data_cache']:
+            with st.container(border=True):
+                st.subheader("Download Raster Data", divider=True)
+                st.caption("You can download the previous raster data generated from the surface model. This is useful for further analysis or visualization in GIS software.")
+                download_raster = st.download_button(
+                    label="Download Raster Data",
+                    data=st.session_state["raster_data_cache"],
+                    file_name="surface_model.tif",
+                    mime="image/tiff"
+                )
+                if download_raster:
+                    st.success("Raster data downloaded successfully!")
             

@@ -13,6 +13,7 @@ class Lists(Enum):
     ACCEPTED_UPLOAD_FORMATS = ['lev', 'cor', 'raw', 'dec', 'LEV', 'COR', 'RAW', 'DEC']
     ACCEPTED_UPLOAD_FORMATS_WXTIDE = ["TXT"]
     ACCEPTED_UPLOAD_FORMATS_WINDROSE = ["CSV"]
+    ACCEPTED_UPLOAD_FORMATS_SURFACE = ["CSV", "TXT"]
 
 class Dicts(Enum):
     COLOR_PALETTES = {
@@ -24,6 +25,21 @@ class Dicts(Enum):
                     'cividis': cm.cividis,
                     'viridis': cm.viridis
                 }
+    
+    # color palettes based on plotly surface model
+    COLOR_PALETTES_SURFACE = {
+        'Viridis': px.colors.sequential.Viridis,
+        'Plasma': px.colors.sequential.Plasma,
+        'Inferno': px.colors.sequential.Inferno,
+        'Cividis': px.colors.sequential.Cividis,
+        'Blues': px.colors.sequential.Blues,
+        'Greens': px.colors.sequential.Greens,
+        'Reds': px.colors.sequential.Reds,
+        'Greys': px.colors.sequential.Greys,
+        'YlOrRd': px.colors.sequential.YlOrRd,
+        'YlGnBu': px.colors.sequential.YlGnBu,
+        'YlGn': px.colors.sequential.YlGn,
+        'BrBG': px.colors.diverging.BrBG}
     
     WIND_DIRECTION_TEMPLATE = {
             "N": (348.75, 11.25),
@@ -44,6 +60,26 @@ class Dicts(Enum):
             "NNW": (326.25, 348.75),
         }
 
+    PROJECTIONS = {
+        "World Geodetic System 1984 (WGS 84)": {
+            "CRS_CODE": 4326,
+            "COMPLETE_CRS_CODE": "EPSG:4326",
+            "ALIAS": "WGS84",
+            "CRS": '+proj=utm +zone=51 +datum=WGS84'
+        },
+        "Universal Transverse Mercator (UTM 51N)": {
+            "CRS_CODE": 32651,
+            "COMPLETE_CRS_CODE": "EPSG:32651",
+            "ALIAS": "UTM51N",
+            "CRS": '+proj=utm +zone=51 +datum=WGS84 +units=m +no_defs'
+        },
+        "Luzon Datum of 1911": {
+            "CRS_CODE": 4253,
+            "COMPLETE_CRS_CODE": "EPSG:4253",
+            "ALIAS": "Luzon1911",
+            "CRS": '+proj=longlat +ellps=clrk66 +no_defs'
+        }
+    }
 
 class Options(Enum):
     FOLIUM_DRAW_OPTIONS = {
