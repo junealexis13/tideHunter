@@ -934,20 +934,24 @@ class Modeller(SingleProcessorAppWidgets):
             color_choose = SurfaceParser.choose_colorscale()
             limit_padding_percentage = SurfaceParser.padding_percentage()
             reso = SurfaceParser.resolution_slider()
+            contour_interval = SurfaceParser.contour_interval()
 
             submit = st.form_submit_button("Generate Surface Model", help="Generate a surface model based on the uploaded data.")
             if submit:
                 if dataset:
                     df = pd.read_csv(StringIO(dataset),delimiter=",")
+                    if not parse.validate_df(df):
+                        # remove incomplete rows
+                        df.dropna(subset=["depth", "Latitude", "Longitude"], inplace=True)
+                    parse.remove_zero_depth_rows(df)
                     df['depth'] = df["depth"].mul(-1)
                     with st.spinner('Processing data...'):
-
                         try:
                             x,y,interpolated = parse.interpolate_data(df, reso)
                             raster_data = parse.raster_to_bytes(interpolated,x,y,projections["COMPLETE_CRS_CODE"])
                             if raster_data:
                                 parse.temp_save(rdata=raster_data)
-                            fig = parse.surface_fig(x, y, interpolated, colorscale=color_choose, limit_padding=limit_padding_percentage)    
+                            fig = parse.surface_fig(x, y, interpolated, colorscale=color_choose, limit_padding=limit_padding_percentage, contour_interval=contour_interval)    
                             st.plotly_chart(fig, theme="streamlit", use_container_width=True, key="surface_plot")
                         except Exception as e:
                             st.error(f"An error occurred while processing the data: {e}")

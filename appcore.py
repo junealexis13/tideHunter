@@ -135,6 +135,7 @@ class SurfaceParser(ElevationParser):
         # colorscale from kwargs
         colorscale = kwargs.get('colorscale', 'Viridis')
         limit_padding = kwargs.get('limit_padding', 0.00)
+        contour_interval = kwargs.get('contour_interval', 1.0)
 
         # Compute z-axis padding
         z_min = np.nanmin(z_interp)
@@ -143,10 +144,20 @@ class SurfaceParser(ElevationParser):
         z_pad = z_range * limit_padding
 
         X, Y = np.meshgrid(gridx, gridy)
-        fig = go.Figure(data=[go.Surface(z=z_interp, x=X, y=Y, colorscale=colorscale)])
+        fig = go.Figure(data=[go.Surface(z=z_interp, x=X, y=Y, 
+                contours={
+                "z": {
+                    "show": True,
+                    "start": np.nanmin(z_interp),
+                    "end": np.nanmax(z_interp),
+                    "size": contour_interval, 
+                    "width": 1         # Line thickness
+                }}, colorscale=colorscale)])
         fig.update_layout(title="3D Surface Model (built from  Spatial Interpolation)", scene=dict(
             xaxis_title="Long", yaxis_title="Lat", zaxis_title="Depth"
         ))
+
+
 
         fig.update_layout(
         title="3D Surface Model (built from Spatial Interpolation)",
@@ -157,9 +168,10 @@ class SurfaceParser(ElevationParser):
             zaxis=dict(range=[z_min - z_pad, z_max + z_pad]),
             camera=dict(
             eye=dict(x=1.5, y=1.5, z=0.5)  # Adjust for zoom and angle
-        )
-        )
-    )
+        )))
+
+        fig.update_traces(contours_z=dict(show=True, usecolormap=True,
+                                  highlightcolor="limegreen", project_z=True))
         return fig
 
     def reproject_memfile(self, memfile: BytesIO, dst_crs: str = 'EPSG:4326') -> BytesIO:
@@ -210,6 +222,42 @@ class SurfaceParser(ElevationParser):
     def temp_save(self, rdata):
         st.session_state['raster_data_cache'] = rdata
 
+    def validate_df(self, df: pd.DataFrame):
+        '''Validate the DataFrame for surface data'''
+        if df.empty:
+            st.toast("The DataFrame is empty. Please upload a valid surface data file.")
+            return False
+        
+        required_columns = ['Longitude', 'Latitude', 'depth']
+        if not all(col in df.columns for col in required_columns):
+            st.toast(f"The DataFrame must contain the following columns: {', '.join(required_columns)}")
+            return False
+        
+        if df[required_columns].isnull().values.any():
+            st.toast("The DataFrame contains NaN values. Performing Cleanup...")
+            return False
+        
+        # check all rows if they have None Long, Lat, and depth
+        if df[required_columns].map(lambda x: x is None).any().any():
+            st.toast("The DataFrame contains None values in Longitude, Latitude, or depth columns. Performing Cleanup...")
+            return False
+        
+        return True
+
+    def remove_incomplete_rows(self, df: pd.DataFrame):
+        '''Remove rows with NaN values in Longitude, Latitude, or depth columns'''
+        if df.empty:
+            return df
+        else:
+            return df.dropna(subset=['Longitude', 'Latitude', 'depth']).reset_index(drop=True)
+        
+    def remove_zero_depth_rows(self, df: pd.DataFrame):
+        '''Remove rows with zero depth values'''
+        if df.empty:
+            return df
+        else:
+            return df[df['depth'] != 0].reset_index(inplace=True,drop=True)
+    
     #other methodsss
     @staticmethod
     def choose_projection():
@@ -258,3 +306,11 @@ class SurfaceParser(ElevationParser):
         st.caption("Adjust the resolution of the surface model. Higher values result in finer detail but longer processing time.")
         return resolution
     
+
+    @staticmethod
+    def contour_interval():
+        '''Choose the contour interval for the surface data'''
+        contour_interval = st.slider('Contour Interval', min_value=1.0, max_value=5.0, value=0.01, step=0.01,
+                                     help='Adjust the contour interval for the surface model.')
+        st.caption("Adjust the contour interval for the surface model. This affects how contours are displayed. The lower the value, the more contour lines will be displayed.")
+        return contour_interval

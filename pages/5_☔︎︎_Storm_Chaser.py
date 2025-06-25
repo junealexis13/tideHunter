@@ -140,6 +140,7 @@ class Body(StormChase):
             typ_tracks = gpd.read_file(shp[0])
             #filter shapefile using SID
             filtered_tracks = typ_tracks[typ_tracks['SID'].isin(storms)]
+            filtered_tracks.reset_index(inplace=True)
             typ_names = pd.unique(filtered_tracks['NAME'])
             nature = [
                     "_".join(x.tolist()) if len(x) > 1 else x.tolist()[0]
@@ -159,7 +160,7 @@ class Body(StormChase):
 
             folium.GeoJson(data=filtered_tracks.to_json(),
                         name='Storm Tracks', 
-                        style_function=lambda x: {"color": "white", "weight": 0.6, "dashArray": "3, 2"},
+                        style_function=lambda x: {"color": "red", "weight": 1.2, "dashArray": "3, 2"},
                         popup=folium.GeoJsonPopup(
                                 fields=["NAME", "NATURE", "SID"],  # 👈 customize these based on your column names
                                 aliases=["Name", "Nature", "Storm ID"],  # 👈 what to show as labels
