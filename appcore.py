@@ -130,7 +130,7 @@ class SurfaceParser(ElevationParser):
         memfile.seek(0)
         return memfile
 
-    def surface_fig(self, gridx, gridy, z_interp, **kwargs):
+    def surface_fig(self, gridx, gridy, z_interp, fig , **kwargs):
 
         # colorscale from kwargs
         colorscale = kwargs.get('colorscale', 'Viridis')
@@ -144,7 +144,8 @@ class SurfaceParser(ElevationParser):
         z_pad = z_range * limit_padding
 
         X, Y = np.meshgrid(gridx, gridy)
-        fig = go.Figure(data=[go.Surface(z=z_interp, x=X, y=Y, 
+
+        fig.add_trace(data=[go.Surface(z=z_interp, x=X, y=Y, 
                 contours={
                 "z": {
                     "show": True,
@@ -156,8 +157,6 @@ class SurfaceParser(ElevationParser):
         fig.update_layout(title="3D Surface Model (built from  Spatial Interpolation)", scene=dict(
             xaxis_title="Long", yaxis_title="Lat", zaxis_title="Depth"
         ))
-
-
 
         fig.update_layout(
         title="3D Surface Model (built from Spatial Interpolation)",
@@ -172,7 +171,6 @@ class SurfaceParser(ElevationParser):
 
         fig.update_traces(contours_z=dict(show=True, usecolormap=True,
                                   highlightcolor="limegreen", project_z=True))
-        return fig
 
     def reproject_memfile(self, memfile: BytesIO, dst_crs: str = 'EPSG:4326') -> BytesIO:
         memfile.seek(0) #starting pointer at zero

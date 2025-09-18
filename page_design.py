@@ -907,29 +907,42 @@ class Modeller(SingleProcessorAppWidgets):
 
         with st.container(border=True):
             st.header("Upload File")
-            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WXTIDE.value, key="wxtide_upload")
+            tide_data = st.file_uploader("Choose a file",type=Lists.ACCEPTED_UPLOAD_FORMATS_WXTIDE.value, 
+                                         accept_multiple_files=True,
+                                          key="wxtide_upload")
 
             if tide_data is not None:
-                raw = parser.parse_upload_io(tide_data)
-                self.filename = tide_data.name
+                dump = []
+                for data in tide_data:
+                    raw = parser.parse_upload_io(data)
+                    dump.append(parser.parse_surface_data_linestring(raw))
                 st.success("File loaded!")
-                return parser.parse_surface_data_linestring(raw)
+                return dump
             
             else:
                 st.write("Upload a valid WXTide TXT tide file.")
                 return None
             
 
-    
+    def load_df(self, dataset, parse: SurfaceParser):
+        df = pd.read_csv(StringIO(dataset),delimiter=",")
+        if not parse.validate_df(df):
+            # remove incomplete rows
+            df.dropna(subset=["depth", "Latitude", "Longitude"], inplace=True)
+        parse.remove_zero_depth_rows(df)
+        df['depth'] = df["depth"].mul(-1)
+        return df
+
     
     def body(self):
         self.app_header()
         self.introduction()
 
-        dataset = self.upload_file_widget()
+        dataset = self.upload_file_widget() #now a list of raw datasets
 
         parse = SurfaceParser()
         with st.form(key="surface_modeller_form"):
+            #control panel
             projections = SurfaceParser.choose_projection()
             color_choose = SurfaceParser.choose_colorscale()
             limit_padding_percentage = SurfaceParser.padding_percentage()
@@ -939,20 +952,20 @@ class Modeller(SingleProcessorAppWidgets):
             submit = st.form_submit_button("Generate Surface Model", help="Generate a surface model based on the uploaded data.")
             if submit:
                 if dataset:
-                    df = pd.read_csv(StringIO(dataset),delimiter=",")
-                    if not parse.validate_df(df):
-                        # remove incomplete rows
-                        df.dropna(subset=["depth", "Latitude", "Longitude"], inplace=True)
-                    parse.remove_zero_depth_rows(df)
-                    df['depth'] = df["depth"].mul(-1)
+                    data = [self.load_df(d, parse) for d in dataset] #list of dataframes or survey meshes
                     with st.spinner('Processing data...'):
                         try:
-                            x,y,interpolated = parse.interpolate_data(df, reso)
-                            raster_data = parse.raster_to_bytes(interpolated,x,y,projections["COMPLETE_CRS_CODE"])
-                            if raster_data:
-                                parse.temp_save(rdata=raster_data)
-                            fig = parse.surface_fig(x, y, interpolated, colorscale=color_choose, limit_padding=limit_padding_percentage, contour_interval=contour_interval)    
+                            fig = go.Figure()
+                            rdata = []
+                            for df in data:
+                                x,y,interpolated = parse.interpolate_data(df, reso)
+                                raster_data = parse.raster_to_bytes(interpolated,x,y,projections["COMPLETE_CRS_CODE"])
+                                if raster_data:
+                                    rdata.append(raster_data)
+                                parse.surface_fig(x, y, interpolated, fig, colorscale=color_choose, limit_padding=limit_padding_percentage, contour_interval=contour_interval)    
                             st.plotly_chart(fig, theme="streamlit", use_container_width=True, key="surface_plot")
+                            parse.temp_save(rdata=raster_data)
+
                         except Exception as e:
                             st.error(f"An error occurred while processing the data: {e}")
                             return
@@ -960,15 +973,16 @@ class Modeller(SingleProcessorAppWidgets):
                     st.error("No dataset uploaded. Please upload a valid dataset.")
 
         if st.session_state['raster_data_cache']:
-            with st.container(border=True):
-                st.subheader("Download Raster Data", divider=True)
-                st.caption("You can download the previous raster data generated from the surface model. This is useful for further analysis or visualization in GIS software.")
-                download_raster = st.download_button(
-                    label="Download Raster Data",
-                    data=st.session_state["raster_data_cache"],
-                    file_name="surface_model.tif",
-                    mime="image/tiff"
-                )
-                if download_raster:
-                    st.success("Raster data downloaded successfully!")
+            for rasters in st.session_state['raster_data_cache']:
+                with st.container(border=True):
+                    st.subheader("Download Raster Data", divider=True)
+                    st.caption("You can download the previous raster data generated from the surface model. This is useful for further analysis or visualization in GIS software.")
+                    download_raster = st.download_button(
+                        label="Download Raster Data",
+                        data=st.session_state["raster_data_cache"],
+                        file_name="surface_model.tif",
+                        mime="image/tiff"
+                    )
+                    if download_raster:
+                        st.success("Raster data downloaded successfully!")
             
