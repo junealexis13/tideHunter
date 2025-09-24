@@ -145,7 +145,7 @@ class SurfaceParser(ElevationParser):
 
         X, Y = np.meshgrid(gridx, gridy)
 
-        fig.add_trace(data=[go.Surface(z=z_interp, x=X, y=Y, 
+        fig.add_trace(go.Surface(z=z_interp, x=X, y=Y, 
                 contours={
                 "z": {
                     "show": True,
@@ -153,7 +153,7 @@ class SurfaceParser(ElevationParser):
                     "end": np.nanmax(z_interp),
                     "size": contour_interval, 
                     "width": 1         # Line thickness
-                }}, colorscale=colorscale)])
+                }}, colorscale=colorscale))
         fig.update_layout(title="3D Surface Model (built from  Spatial Interpolation)", scene=dict(
             xaxis_title="Long", yaxis_title="Lat", zaxis_title="Depth"
         ))

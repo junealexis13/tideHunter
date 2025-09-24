@@ -952,37 +952,37 @@ class Modeller(SingleProcessorAppWidgets):
             submit = st.form_submit_button("Generate Surface Model", help="Generate a surface model based on the uploaded data.")
             if submit:
                 if dataset:
-                    data = [self.load_df(d, parse) for d in dataset] #list of dataframes or survey meshes
+                    data = [self.load_df(d, parse) for d in dataset] 
+                    cleaned_data = [d.drop(columns=['ident']) for d in data] #removes the ident column because it will complicate the merge
+                    merged_df = pd.concat(cleaned_data, ignore_index=True)
+                    
+                    #list of dataframes or survey meshes
                     with st.spinner('Processing data...'):
-                        try:
-                            fig = go.Figure()
-                            rdata = []
-                            for df in data:
-                                x,y,interpolated = parse.interpolate_data(df, reso)
-                                raster_data = parse.raster_to_bytes(interpolated,x,y,projections["COMPLETE_CRS_CODE"])
-                                if raster_data:
-                                    rdata.append(raster_data)
-                                parse.surface_fig(x, y, interpolated, fig, colorscale=color_choose, limit_padding=limit_padding_percentage, contour_interval=contour_interval)    
-                            st.plotly_chart(fig, theme="streamlit", use_container_width=True, key="surface_plot")
-                            parse.temp_save(rdata=raster_data)
+                        # try:
+                        fig = go.Figure()
+                        x,y,interpolated = parse.interpolate_data(merged_df, reso)
+                        raster_data = parse.raster_to_bytes(interpolated,x,y,projections["COMPLETE_CRS_CODE"])
+                        if raster_data:
+                            parse.surface_fig(x, y, interpolated, fig, colorscale=color_choose, limit_padding=limit_padding_percentage, contour_interval=contour_interval)    
+                        st.plotly_chart(fig, theme="streamlit", use_container_width=True, key="surface_plot")
+                        parse.temp_save(rdata=raster_data)
 
-                        except Exception as e:
-                            st.error(f"An error occurred while processing the data: {e}")
-                            return
+                        # except Exception as e:
+                        #     st.error(f"An error occurred while processing the data: {e}")
+                        #     return
                 else:
                     st.error("No dataset uploaded. Please upload a valid dataset.")
 
         if st.session_state['raster_data_cache']:
-            for rasters in st.session_state['raster_data_cache']:
-                with st.container(border=True):
-                    st.subheader("Download Raster Data", divider=True)
-                    st.caption("You can download the previous raster data generated from the surface model. This is useful for further analysis or visualization in GIS software.")
-                    download_raster = st.download_button(
-                        label="Download Raster Data",
-                        data=st.session_state["raster_data_cache"],
-                        file_name="surface_model.tif",
-                        mime="image/tiff"
-                    )
-                    if download_raster:
-                        st.success("Raster data downloaded successfully!")
+            with st.container(border=True):
+                st.subheader("Download Raster Data", divider=True)
+                st.caption("You can download the previous raster data generated from the surface model. This is useful for further analysis or visualization in GIS software.")
+                download_raster = st.download_button(
+                    label="Download Raster Data",
+                    data=st.session_state["raster_data_cache"],
+                    file_name="surface_model.tif",
+                    mime="image/tiff"
+                )
+                if download_raster:
+                    st.success("Raster data downloaded successfully!")
             
